@@ -1,0 +1,8 @@
+*
+!*/
+
+!*.py
+!README.md
+!.gitignore
+
+!RQPFPSeeker/cycles/pf/cycleData_BTCUSDT.json

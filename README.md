@@ -1,6 +1,8 @@
 # AutoTradeMachine_Eta RQP (Remaining Quantity Percentage) Function Parameters Seeker
 
-This is a subproject of the seventh version of the **Auto Trade Machine** project.
+This is a subproject of the seventh version of the **ATM** project - ATM Eta.
+
+I started this subproject as an experimentation for a custom-designed trading strategy called **RQP (Remaining Quantity Percentage)**. 
 
 
 

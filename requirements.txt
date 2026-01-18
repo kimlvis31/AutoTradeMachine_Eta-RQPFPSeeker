@@ -1,0 +1,5 @@
+torch==2.6.0
+triton-windows==3.2.0.post21
+numpy==2.4.0
+matplotlib==3.10.8
+termcolor==3.2.0

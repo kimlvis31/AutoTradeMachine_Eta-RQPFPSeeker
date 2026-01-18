@@ -1,8 +1,28 @@
 *
 !*/
 
+.venv/
+.venv/*
+.idea/
+__pycache__/
+
 !*.py
 !README.md
+!README.ko.md
 !.gitignore
+!docs
+!docs/*.png
 
-!cycles/pf/cycleData_BTCUSDT.json
+!setup.bat
+!setup.sh
+!run.bat
+!run.sh
+!requirements.txt
+
+!rqpfunctions
+!rqpfunctions/.gitkeep
+rqpfunctions/*.py
+!rqpfunctions/rqpf_CLASSICALSIGNALDEFAULT.py
+
+!ppips
+!ppips/.gitkeep

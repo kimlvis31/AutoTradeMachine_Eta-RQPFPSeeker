@@ -147,6 +147,7 @@ if __name__ == "__main__":
                                                   repopulationRatio      = _ptp['repopulationRatio'],
                                                   repopulationInterval   = _ptp['repopulationInterval'],
                                                   repopulationGuideRatio = _ptp['repopulationGuideRatio'],
+                                                  repopulationDecayRate  = _ptp['repopulationDecayRate'],
                                                   scoring                = _ptp['scoring'], 
                                                   scoringSamples         = _ptp['scoringSamples'], 
                                                   terminationThreshold   = _ptp['terminationThreshold'], 
@@ -174,6 +175,8 @@ if __name__ == "__main__":
                 else:                                                               print(f"      - Repopulation Interval:    {asp['repopulationInterval']}")
                 if asp['repopulationGuideRatio'] != _ptp['repopulationGuideRatio']: print(f"      - Repopulation Guide Ratio: {_ptp['repopulationGuideRatio']} -> {asp['repopulationGuideRatio']}")
                 else:                                                               print(f"      - Repopulation Guide Ratio: {asp['repopulationGuideRatio']}")
+                if asp['repopulationDecayRate']  != _ptp['repopulationDecayRate']:  print(f"      - Repopulation Decay Rate:  {_ptp['repopulationDecayRate']} -> {asp['repopulationDecayRate']}")
+                else:                                                               print(f"      - Repopulation Decay Rate:  {asp['repopulationDecayRate']}")
                 if asp['scoring']                != _ptp['scoring']:                print(f"      - Scoring:                  {_ptp['scoring']} -> {asp['scoring']}")
                 else:                                                               print(f"      - Scoring:                  {asp['scoring']}")
                 if asp['terminationThreshold']   != _ptp['terminationThreshold']:   print(f"      - Termination Threshold:    {_ptp['terminationThreshold']} -> {asp['terminationThreshold']}")
@@ -295,21 +298,23 @@ if __name__ == "__main__":
 
             #Process Descriptor
             print(f"  [{int(_pIndex_str)+1} / {len(_resultData['results'])}] <PPIPS - '{_ptp['ppips']}'>")
-            print(f"    - Exit Function Type:      {_ptp['exitFunctionType']}")
-            print(f"    - Leverage:                {_ptp['leverage']}")
-            print(f"    - PSL Re-Entry:            {_ptp['pslReentry']}")
-            print(f"    - Parameter Batch Size:    {_ptp['parameterBatchSize']}")
-            print(f"    - Parameter Configuration: {_ptp['paramConfig']}")
-            print(f"    - Number of Seeker Points: {_ptp['nSeekerPoints']}")
-            print(f"    - Number of Repetition:    {_ptp['nRepetition']}")
-            print(f"    - Learning Rate:           {_ptp['learningRate']}")
-            print(f"    - Delta Ratio:             {_ptp['deltaRatio']}")
-            print(f"    - Velocity Beta:           {_ptp['beta_velocity']}")
-            print(f"    - Momentum Beta:           {_ptp['beta_momentum']}")
-            print(f"    - Repopulation Ratio:      {_ptp['repopulationRatio']}")
-            print(f"    - Repopulation Interval:   {_ptp['repopulationInterval']}")
-            print(f"    - Scoring:                 {_ptp['scoring']}")
-            print(f"    - Termination Threshold:   {_ptp['terminationThreshold']}")
+            print(f"    - Exit Function Type:       {_ptp['exitFunctionType']}")
+            print(f"    - Leverage:                 {_ptp['leverage']}")
+            print(f"    - PSL Re-Entry:             {_ptp['pslReentry']}")
+            print(f"    - Parameter Batch Size:     {_ptp['parameterBatchSize']}")
+            print(f"    - Parameter Configuration:  {_ptp['paramConfig']}")
+            print(f"    - Number of Seeker Points:  {_ptp['nSeekerPoints']}")
+            print(f"    - Number of Repetition:     {_ptp['nRepetition']}")
+            print(f"    - Learning Rate:            {_ptp['learningRate']}")
+            print(f"    - Delta Ratio:              {_ptp['deltaRatio']}")
+            print(f"    - Velocity Beta:            {_ptp['beta_velocity']}")
+            print(f"    - Momentum Beta:            {_ptp['beta_momentum']}")
+            print(f"    - Repopulation Ratio:       {_ptp['repopulationRatio']}")
+            print(f"    - Repopulation Interval:    {_ptp['repopulationInterval']}")
+            print(f"    - Repopulation Guide Ratio: {_ptp['repopulationGuideRatio']}")
+            print(f"    - Repopulation Decay Rate:  {_ptp['repopulationDecayRate']}")
+            print(f"    - Scoring:                  {_ptp['scoring']}")
+            print(f"    - Termination Threshold:    {_ptp['terminationThreshold']}")
 
             #PPIPS Match Check
             with open(_dir_ppips_file_descriptor, 'r') as f: _ppips_descriptor = json.loads(f.read())
@@ -380,4 +385,3 @@ if __name__ == "__main__":
         print(termcolor.colored("[Seeker Result Read Complete]", 'light_blue'))
 
     print(termcolor.colored("\n<RQP MAP PARAMETERS SEEKER PROCESS COMPLETE>", 'light_green'))
-    while (True): time.sleep(100)

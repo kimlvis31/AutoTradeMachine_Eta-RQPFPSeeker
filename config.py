@@ -7,9 +7,9 @@ PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                 }
 
 #[2]: PPIPS to Process
-PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
+PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                    'exitFunctionType': 'ROTATIONALGAUSSIAN1',
-                   'leverage':   2,
+                   'leverage':   1,
                    'pslReentry': False,
                    'parameterBatchSize': 32*4096,
                    'paramConfig': [None,   #FSL Immed
@@ -33,10 +33,11 @@ PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                    'beta_velocity':          0.999,
                    'beta_momentum':          0.900,
                    'repopulationRatio':      0.95,
-                   'repopulationInterval':   5,
+                   'repopulationInterval':   10,
                    'repopulationGuideRatio': 0.5,
+                   'repopulationDecayRate':  0.1,
                    'scoringSamples':         50,
-                   'scoring':                ('SHARPERATIO', (1e-4, 0.5, None, 1.0)),
+                   'scoring':                ('SHARPERATIO', (1e-4, 0.2, 0.1, 1.0)),
                    'terminationThreshold':   1e-6,
                   },
                  ]
@@ -54,30 +55,3 @@ RCODETOREAD = 'rqpfpResult_1768759273'
 [3]: READ 
 """
 MODE = 'SEEK'
-
-"""
-PPIPSTOPROCESS = [{'ppips':            'USC10_ppips\\USC10_BTCUSDT',
-                   'exitFunctionType': 'CLASSICALSIGNALDEFAULT',
-                   'leverage':   1,
-                   'pslReentry': False,
-                   'parameterBatchSize': 32*4096,
-                   'paramConfig': [None,   #FSL Immed
-                                   1.0000, #FSL Close
-                                   None,   #Delta
-                                   None,   #Strength - SHORT
-                                   None,   #Strength - LONG
-                                   ],
-                   'nSeekerPoints':        1000,
-                   'nRepetition':          1,
-                   'learningRate':         0.001,
-                   'deltaRatio':           0.20,
-                   'beta_velocity':        0.999,
-                   'beta_momentum':        0.900,
-                   'repopulationRatio':    0.95,
-                   'repopulationInterval': 5,
-                   'scoringSamples':       50,
-                   'scoring':              ('SHARPERATIO', (1e-4, 0.5, 1.0)),
-                   'terminationThreshold': 1e-5,
-                  },
-                 ]
-"""

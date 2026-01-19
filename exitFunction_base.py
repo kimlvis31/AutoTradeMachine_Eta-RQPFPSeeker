@@ -2,6 +2,7 @@ import numpy
 import torch
 import termcolor
 import sys
+import math
 from functools import wraps
 import triton
 import triton.language as tl
@@ -443,6 +444,7 @@ class exitFunction():
                          repopulationRatio:      float, 
                          repopulationInterval:   int,
                          repopulationGuideRatio: float,
+                         repopulationDecayRate:  float,
                          scoring:                tuple[str, float],
                          scoringSamples:         int,
                          terminationThreshold:   float) -> None:
@@ -493,6 +495,9 @@ class exitFunction():
         #---[2-8]:  repopulationGuideRatio
         if type(repopulationGuideRatio) not in (float, int): repopulationGuideRatio = 0.5
         if not (0.0 <= repopulationGuideRatio <= 1.0):       repopulationGuideRatio = 0.5
+        #---[2-8]:  repopulationDecayRate
+        if type(repopulationDecayRate) not in (float, int): repopulationDecayRate = 0.1
+        if not (0.0 <= repopulationDecayRate <= 1.0):       repopulationDecayRate = 0.1
         #---[2-9]:  scoring
         if type(scoring) is not tuple or not len(scoring) == 2: scoring = ('SHARPERATIO', (1e-4, 1.0))
         _scoring_type, _scoring_params = scoring
@@ -572,6 +577,7 @@ class exitFunction():
                          'repopulationRatio':      repopulationRatio,
                          'repopulationInterval':   repopulationInterval,
                          'repopulationGuideRatio': repopulationGuideRatio,
+                         'repopulationDecayRate':  repopulationDecayRate,
                          'scoring':                scoring,
                          'scoringSamples':         scoringSamples,
                          'terminationThreshold':   terminationThreshold,
@@ -601,6 +607,7 @@ class exitFunction():
         seeker_applied['repopulationRatio']      = self.__seeker['repopulationRatio']
         seeker_applied['repopulationInterval']   = self.__seeker['repopulationInterval']
         seeker_applied['repopulationGuideRatio'] = self.__seeker['repopulationGuideRatio']
+        seeker_applied['repopulationDecayRate']  = self.__seeker['repopulationDecayRate']
         seeker_applied['scoring']                = self.__seeker['scoring']
         seeker_applied['scoringSamples']         = self.__seeker['scoringSamples']
         seeker_applied['terminationThreshold']   = self.__seeker['terminationThreshold']
@@ -816,9 +823,10 @@ class exitFunction():
         seeker['_currentStep'] = currentStep+1
 
         #[9]: Repopulate (If needed)
-        repop_guideRatio = seeker['repopulationGuideRatio']
         repop_interval   = seeker['repopulationInterval']
         repop_ratio      = seeker['repopulationRatio']
+        repop_guideRatio = seeker['repopulationGuideRatio']
+        repop_decayRate  = seeker['repopulationDecayRate']
         if (currentStep % repop_interval == 0):
             #[5-1]: Number of seekers to repopulate (Randomize)
             n_toRepopulate = int(nSeekerPoints * repop_ratio)
@@ -837,7 +845,8 @@ class exitFunction():
                     #[5-2-1]: Survived mean and STD
                     survived = seeker['_params_base'][survived_indices]
                     survived_mean = torch.mean(survived, dim=0)
-                    survived_std  = torch.clamp_min(torch.std(survived, dim=0), min = 1e-4)
+                    survived_std  = torch.std(survived, dim=0)*math.exp(-(currentStep//repop_interval-1)*repop_decayRate)
+                    survived_std  = torch.clamp_min(survived_std, min = 1e-4)
                     
                     #[5-2-2]: Generate random params using normal distribution
                     p_guided = torch.normal(mean = survived_mean.repeat(n_guided, 1), 

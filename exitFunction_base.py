@@ -3,6 +3,7 @@ import torch
 import termcolor
 import sys
 import math
+import time
 from functools import wraps
 import triton
 import triton.language as tl
@@ -846,7 +847,7 @@ class exitFunction():
                     survived = seeker['_params_base'][survived_indices]
                     survived_mean = torch.mean(survived, dim=0)
                     survived_std  = torch.std(survived, dim=0)*math.exp(-(currentStep//repop_interval-1)*repop_decayRate)
-                    survived_std  = torch.clamp_min(survived_std, min = 1e-4)
+                    survived_std  = torch.max(survived_std, 2.0/params_rounding_factors)
                     
                     #[5-2-2]: Generate random params using normal distribution
                     p_guided = torch.normal(mean = survived_mean.repeat(n_guided, 1), 

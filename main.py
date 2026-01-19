@@ -195,7 +195,6 @@ if __name__ == "__main__":
 
                 #Seeker
                 print(f"    - Seeking eFunction Optimized Parameters...")
-                nPrintedLines = None
                 console       = rConsole(highlight=False)
                 complete      = False
                 repIndex_last = None
@@ -209,8 +208,8 @@ if __name__ == "__main__":
                                 _repetitionIndex, 
                                 _step, 
                                 _bestResult, 
-                                t_processing_paramsSet_gpu_ms,
-                                t_processing_paramsSet_cpu_ms
+                                t_processing_paramsSet_sim_ms,
+                                t_processing_paramsSet_ppp_ms
                              ) = _eFunction.runSeeker()
                             _bestResult = {'repetitionIndex': _repetitionIndex,
                                            'functionParams':  _bestResult[0], 
@@ -240,7 +239,7 @@ if __name__ == "__main__":
                             _volatility_tMin_997 = math.exp(-_volatility*3)-1
                             _volatility_tMax_997 = math.exp( _volatility*3)-1
                             ppstr = (f"      - Progress:                       <Repetition: {_repetitionIndex+1}/{_ptp['nRepetition']}> <Step: {_step}>\n"
-                                     f"      - Parameter Set Processing Speed: {t_processing_paramsSet_gpu_ms*1e3:.3f} us [GPU], {t_processing_paramsSet_cpu_ms*1e3:.3f} us [CPU]\n"
+                                     f"      - Parameter Set Processing Speed: {t_processing_paramsSet_sim_ms*1e3:.3f} us [SIMULATION], {t_processing_paramsSet_ppp_ms*1e3:.3f} us [PRE/POST PROCESSING]\n"
                                      f"      - Params:                         {bestResult['functionParams']}\n"
                                      f"      - Final Balance:                  {bestResult['finalBalance']:.8f}\n"
                                      f"      - Growth Rate:                    [{_grStr_color}]{_grStr_sign}{_growthRate_interval:.8f} [default]/ [{_grStr_color}]{_grStr_sign}{_growthRate_daily*100:.3f} % [default][Daily] / [{_grStr_color}]{_grStr_sign}{_growthRate_monthly*100:.3f} % [default][Monthly]\n"

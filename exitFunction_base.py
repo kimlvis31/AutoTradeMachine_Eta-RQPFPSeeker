@@ -752,7 +752,7 @@ class exitFunction():
                           round(float(balance_bestFit_volatilities[max_idx]), 12), #Volatility
                           round(float(scores_batch[max_idx]),                 12)) #Score
             bestResults.append(bestResult)
-        t_processing_paramsSet_ms = t_elapsed_gpu_simulation_total_ms/len(params_test)
+        t_processing_sim_paramsSet_ms = t_elapsed_gpu_simulation_total_ms/len(params_test)
 
         #[5]: Best Reulst Record
         bestResult          = max(bestResults, key=lambda x: x[4])
@@ -824,8 +824,8 @@ class exitFunction():
                         nRepetition_current, 
                         currentStep, 
                         bestResults_thisRep[-1], 
-                        t_processing_paramsSet_ms,
-                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
+                        t_processing_sim_paramsSet_ms,
+                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_sim_paramsSet_ms)
             else:
                 #Reset base parameters, velocity, and momentum
                 params_base = torch.rand(size = (nSeekerPoints, nParameters), device = 'cuda', dtype = _TORCHDTYPE)
@@ -843,8 +843,8 @@ class exitFunction():
                         nRepetition_current, 
                         currentStep, 
                         bestResults_thisRep[-1], 
-                        t_processing_paramsSet_ms,
-                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
+                        t_processing_sim_paramsSet_ms,
+                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_sim_paramsSet_ms)
 
         #[10]: Step Count Update
         seeker['_currentStep'] = currentStep+1
@@ -906,8 +906,8 @@ class exitFunction():
                 nRepetition_current, 
                 currentStep, 
                 bestResults_thisRep[-1], 
-                t_processing_paramsSet_ms,
-                (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
+                t_processing_sim_paramsSet_ms,
+                (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_sim_paramsSet_ms)
 
     def __processBatch(self, params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         #Data

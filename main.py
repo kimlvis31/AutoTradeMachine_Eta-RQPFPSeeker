@@ -137,40 +137,47 @@ if __name__ == "__main__":
                 _eFunction.preprocessData(data = numpy.load(_dir_file_data))
                 _t_1 = time.perf_counter_ns()
                 print(f"    - PPIPS Preprocessing Complete! <{(_t_1-_t_0)/1e6:.3f} ms>")
-                asp = _eFunction.initializeSeeker(paramConfig          = _ptp['paramConfig'], 
-                                                  nSeekerPoints        = _ptp['nSeekerPoints'],
-                                                  nRepetition          = _ptp['nRepetition'],
-                                                  learningRate         = _ptp['learningRate'],
-                                                  deltaRatio           = _ptp['deltaRatio'],
-                                                  beta_velocity        = _ptp['beta_velocity'],
-                                                  beta_momentum        = _ptp['beta_momentum'],
-                                                  repopulationRatio    = _ptp['repopulationRatio'],
-                                                  repopulationInterval = _ptp['repopulationInterval'],
-                                                  scoring              = _ptp['scoring'], 
-                                                  scoringSamples       = _ptp['scoringSamples'], 
-                                                  terminationThreshold = _ptp['terminationThreshold'], 
+                asp = _eFunction.initializeSeeker(paramConfig            = _ptp['paramConfig'], 
+                                                  nSeekerPoints          = _ptp['nSeekerPoints'],
+                                                  nRepetition            = _ptp['nRepetition'],
+                                                  learningRate           = _ptp['learningRate'],
+                                                  deltaRatio             = _ptp['deltaRatio'],
+                                                  beta_velocity          = _ptp['beta_velocity'],
+                                                  beta_momentum          = _ptp['beta_momentum'],
+                                                  repopulationRatio      = _ptp['repopulationRatio'],
+                                                  repopulationInterval   = _ptp['repopulationInterval'],
+                                                  repopulationGuideRatio = _ptp['repopulationGuideRatio'],
+                                                  scoring                = _ptp['scoring'], 
+                                                  scoringSamples         = _ptp['scoringSamples'], 
+                                                  terminationThreshold   = _ptp['terminationThreshold'], 
                                                   )
                 print(f"    - eFunction Initialization Complete!")
-                if asp['nSeekerPoints']        != _ptp['nSeekerPoints']:        print(f"      - Number of Seeker Points: {_ptp['nSeekerPoints']} -> {asp['nSeekerPoints']}")
-                else:                                                           print(f"      - Number of Seeker Points: {asp['nSeekerPoints']}")
-                if asp['nRepetition']          != _ptp['nRepetition']:          print(f"      - Number of Repetition:    {_ptp['nRepetition']} -> {asp['nRepetition']}")
-                else:                                                           print(f"      - Number of Repetition:    {asp['nRepetition']}")
-                if asp['learningRate']         != _ptp['learningRate']:         print(f"      - Learning Rate:           {_ptp['learningRate']} -> {asp['learningRate']}")
-                else:                                                           print(f"      - Learning Rate:           {asp['learningRate']}")
-                if asp['deltaRatio']           != _ptp['deltaRatio']:           print(f"      - Delta Ratio:             {_ptp['deltaRatio']} -> {asp['deltaRatio']}")
-                else:                                                           print(f"      - Delta Ratio:             {asp['deltaRatio']}")
-                if asp['beta_velocity']        != _ptp['beta_velocity']:        print(f"      - Velocity Beta:           {_ptp['beta_velocity']} -> {asp['beta_velocity']}")
-                else:                                                           print(f"      - Velocity Beta:           {asp['beta_velocity']}")
-                if asp['beta_momentum']        != _ptp['beta_momentum']:        print(f"      - Momentum Beta:           {_ptp['beta_momentum']} -> {asp['beta_momentum']}")
-                else:                                                           print(f"      - Momentum Beta:           {asp['beta_momentum']}")
-                if asp['repopulationRatio']    != _ptp['repopulationRatio']:    print(f"      - Repopulation Ratio:      {_ptp['repopulationRatio']} -> {asp['repopulationRatio']}")
-                else:                                                           print(f"      - Repopulation Ratio:      {asp['repopulationRatio']}")
-                if asp['repopulationInterval'] != _ptp['repopulationInterval']: print(f"      - Repopulation Interval:   {_ptp['repopulationInterval']} -> {asp['repopulationInterval']}")
-                else:                                                           print(f"      - Repopulation Interval:   {asp['repopulationInterval']}")
-                if asp['scoring']              != _ptp['scoring']:              print(f"      - Scoring:                 {_ptp['scoring']} -> {asp['scoring']}")
-                else:                                                           print(f"      - Scoring:                 {asp['scoring']}")
-                if asp['terminationThreshold'] != _ptp['terminationThreshold']: print(f"      - Termination Threshold:   {_ptp['terminationThreshold']} -> {asp['terminationThreshold']}")
-                else:                                                           print(f"      - Termination Threshold:   {asp['terminationThreshold']}")
+                print(f"      - Exit Function Type:   {_ptp['exitFunctionType']}")
+                print(f"      - Leverage:             {_ptp['leverage']}")
+                print(f"      - PSL Re-entry:         {_ptp['pslReentry']}")
+                print(f"      - Parameter Batch Size: {_ptp['parameterBatchSize']}")
+                if asp['nSeekerPoints']          != _ptp['nSeekerPoints']:          print(f"      - Number of Seeker Points:  {_ptp['nSeekerPoints']} -> {asp['nSeekerPoints']}")
+                else:                                                               print(f"      - Number of Seeker Points:  {asp['nSeekerPoints']}")
+                if asp['nRepetition']            != _ptp['nRepetition']:            print(f"      - Number of Repetition:     {_ptp['nRepetition']} -> {asp['nRepetition']}")
+                else:                                                               print(f"      - Number of Repetition:     {asp['nRepetition']}")
+                if asp['learningRate']           != _ptp['learningRate']:           print(f"      - Learning Rate:            {_ptp['learningRate']} -> {asp['learningRate']}")
+                else:                                                               print(f"      - Learning Rate:            {asp['learningRate']}")
+                if asp['deltaRatio']             != _ptp['deltaRatio']:             print(f"      - Delta Ratio:              {_ptp['deltaRatio']} -> {asp['deltaRatio']}")
+                else:                                                               print(f"      - Delta Ratio:              {asp['deltaRatio']}")
+                if asp['beta_velocity']          != _ptp['beta_velocity']:          print(f"      - Velocity Beta:            {_ptp['beta_velocity']} -> {asp['beta_velocity']}")
+                else:                                                               print(f"      - Velocity Beta:            {asp['beta_velocity']}")
+                if asp['beta_momentum']          != _ptp['beta_momentum']:          print(f"      - Momentum Beta:            {_ptp['beta_momentum']} -> {asp['beta_momentum']}")
+                else:                                                               print(f"      - Momentum Beta:            {asp['beta_momentum']}")
+                if asp['repopulationRatio']      != _ptp['repopulationRatio']:      print(f"      - Repopulation Ratio:       {_ptp['repopulationRatio']} -> {asp['repopulationRatio']}")
+                else:                                                               print(f"      - Repopulation Ratio:       {asp['repopulationRatio']}")
+                if asp['repopulationInterval']   != _ptp['repopulationInterval']:   print(f"      - Repopulation Interval:    {_ptp['repopulationInterval']} -> {asp['repopulationInterval']}")
+                else:                                                               print(f"      - Repopulation Interval:    {asp['repopulationInterval']}")
+                if asp['repopulationGuideRatio'] != _ptp['repopulationGuideRatio']: print(f"      - Repopulation Guide Ratio: {_ptp['repopulationGuideRatio']} -> {asp['repopulationGuideRatio']}")
+                else:                                                               print(f"      - Repopulation Guide Ratio: {asp['repopulationGuideRatio']}")
+                if asp['scoring']                != _ptp['scoring']:                print(f"      - Scoring:                  {_ptp['scoring']} -> {asp['scoring']}")
+                else:                                                               print(f"      - Scoring:                  {asp['scoring']}")
+                if asp['terminationThreshold']   != _ptp['terminationThreshold']:   print(f"      - Termination Threshold:    {_ptp['terminationThreshold']} -> {asp['terminationThreshold']}")
+                else:                                                               print(f"      - Termination Threshold:    {asp['terminationThreshold']}")
                 _ptp['nSeekerPoints']        = asp['nSeekerPoints']
                 _ptp['nRepetition']          = asp['nRepetition']
                 _ptp['learningRate']         = asp['learningRate']

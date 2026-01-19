@@ -434,17 +434,18 @@ class exitFunction():
 
     def initializeSeeker(self, 
                          paramConfig: list, 
-                         nSeekerPoints:        int, 
-                         nRepetition:          int,
-                         learningRate:         float, 
-                         deltaRatio:           float,
-                         beta_velocity:        float,
-                         beta_momentum:        float,
-                         repopulationRatio:    float, 
-                         repopulationInterval: int,
-                         scoring:              tuple[str, float],
-                         scoringSamples:       int,
-                         terminationThreshold: float) -> None:
+                         nSeekerPoints:          int, 
+                         nRepetition:            int,
+                         learningRate:           float, 
+                         deltaRatio:             float,
+                         beta_velocity:          float,
+                         beta_momentum:          float,
+                         repopulationRatio:      float, 
+                         repopulationInterval:   int,
+                         repopulationGuideRatio: float,
+                         scoring:                tuple[str, float],
+                         scoringSamples:         int,
+                         terminationThreshold:   float) -> None:
         """
         self.model = [{'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Immed <NECESSARY>
                       {'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Close <NECESSARY>
@@ -489,6 +490,9 @@ class exitFunction():
         #---[2-8]:  repopulationInterval
         if type(repopulationInterval) is not int: repopulationInterval = 10
         if not (1 <= repopulationInterval):       repopulationInterval = 10
+        #---[2-8]:  repopulationGuideRatio
+        if type(repopulationGuideRatio) not in (float, int): repopulationGuideRatio = 0.5
+        if not (0.0 <= repopulationGuideRatio <= 1.0):       repopulationGuideRatio = 0.5
         #---[2-9]:  scoring
         if type(scoring) is not tuple or not len(scoring) == 2: scoring = ('SHARPERATIO', (1e-4, 1.0))
         _scoring_type, _scoring_params = scoring
@@ -558,18 +562,19 @@ class exitFunction():
 
         #[7]: Seeker Update
         self.__seeker = {#Seeker Parameters
-                         'paramConfig':          paramConfig.copy(),
-                         'nSeekerPoints':        nSeekerPoints,
-                         'nRepetition':          nRepetition,
-                         'learningRate':         learningRate,
-                         'deltaRatio':           deltaRatio,
-                         'beta_velocity':        beta_velocity,
-                         'beta_momentum':        beta_momentum,
-                         'repopulationRatio':    repopulationRatio,
-                         'repopulationInterval': repopulationInterval,
-                         'scoring':              scoring,
-                         'scoringSamples':       scoringSamples,
-                         'terminationThreshold': terminationThreshold,
+                         'paramConfig':            paramConfig.copy(),
+                         'nSeekerPoints':          nSeekerPoints,
+                         'nRepetition':            nRepetition,
+                         'learningRate':           learningRate,
+                         'deltaRatio':             deltaRatio,
+                         'beta_velocity':          beta_velocity,
+                         'beta_momentum':          beta_momentum,
+                         'repopulationRatio':      repopulationRatio,
+                         'repopulationInterval':   repopulationInterval,
+                         'repopulationGuideRatio': repopulationGuideRatio,
+                         'scoring':                scoring,
+                         'scoringSamples':         scoringSamples,
+                         'terminationThreshold':   terminationThreshold,
                          #Process Variables
                          '_params_rounding_factors': params_rounding_factors,
                          '_params_fixed_mask':       params_fixed_mask,
@@ -586,18 +591,19 @@ class exitFunction():
         
         #[8]: Applied Seeker Configuration
         seeker_applied = dict()
-        seeker_applied['paramConfig']          = paramConfig.copy()
-        seeker_applied['nSeekerPoints']        = self.__seeker['nSeekerPoints']
-        seeker_applied['nRepetition']          = self.__seeker['nRepetition']
-        seeker_applied['learningRate']         = self.__seeker['learningRate']
-        seeker_applied['deltaRatio']           = self.__seeker['deltaRatio']
-        seeker_applied['beta_velocity']        = self.__seeker['beta_velocity']
-        seeker_applied['beta_momentum']        = self.__seeker['beta_momentum']
-        seeker_applied['repopulationRatio']    = self.__seeker['repopulationRatio']
-        seeker_applied['repopulationInterval'] = self.__seeker['repopulationInterval']
-        seeker_applied['scoring']              = self.__seeker['scoring']
-        seeker_applied['scoringSamples']       = self.__seeker['scoringSamples']
-        seeker_applied['terminationThreshold'] = self.__seeker['terminationThreshold']
+        seeker_applied['paramConfig']            = paramConfig.copy()
+        seeker_applied['nSeekerPoints']          = self.__seeker['nSeekerPoints']
+        seeker_applied['nRepetition']            = self.__seeker['nRepetition']
+        seeker_applied['learningRate']           = self.__seeker['learningRate']
+        seeker_applied['deltaRatio']             = self.__seeker['deltaRatio']
+        seeker_applied['beta_velocity']          = self.__seeker['beta_velocity']
+        seeker_applied['beta_momentum']          = self.__seeker['beta_momentum']
+        seeker_applied['repopulationRatio']      = self.__seeker['repopulationRatio']
+        seeker_applied['repopulationInterval']   = self.__seeker['repopulationInterval']
+        seeker_applied['repopulationGuideRatio'] = self.__seeker['repopulationGuideRatio']
+        seeker_applied['scoring']                = self.__seeker['scoring']
+        seeker_applied['scoringSamples']         = self.__seeker['scoringSamples']
+        seeker_applied['terminationThreshold']   = self.__seeker['terminationThreshold']
 
         return seeker_applied
     
@@ -810,25 +816,54 @@ class exitFunction():
         seeker['_currentStep'] = currentStep+1
 
         #[9]: Repopulate (If needed)
-        repop_interval = seeker['repopulationInterval']
-        repop_ratio    = seeker['repopulationRatio']
+        repop_guideRatio = seeker['repopulationGuideRatio']
+        repop_interval   = seeker['repopulationInterval']
+        repop_ratio      = seeker['repopulationRatio']
         if (currentStep % repop_interval == 0):
             #[5-1]: Number of seekers to repopulate (Randomize)
             n_toRepopulate = int(nSeekerPoints * repop_ratio)
             if 0 < n_toRepopulate:
-                #[5-2]: Best scores per seeker
-                best_scores_perSeeker, _ = torch.max(scores_view.view(nSeekerPoints, -1), dim=1)
-                #[5-3]: Repopulation target indices
-                bsps_indices_repopTarget = torch.argsort(best_scores_perSeeker)[:n_toRepopulate]
-                #[5-4]: Generate random bases parameter
-                params_base_new_rt = torch.rand((n_toRepopulate, nParameters), device='cuda', dtype=_TORCHDTYPE)
-                params_base_new_rt = params_base_new_rt * (params_max - params_min) + params_min
-                params_base_new_rt = torch.round(params_base_new_rt * params_rounding_factors) / params_rounding_factors
-                params_base_new_rt[:, params_fixed_mask] = params_fixed_values[params_fixed_mask]
-                #[5-5]: Apply newly randomized base parameters
-                seeker['_params_base'][bsps_indices_repopTarget] = params_base_new_rt
-                seeker['_momentum'][bsps_indices_repopTarget]    = 0.0
-                seeker['_velocity'][bsps_indices_repopTarget]    = 0.0
+                scores_flat    = scores_view.view(nSeekerPoints, -1).max(dim=1)[0]
+                sorted_indices = torch.argsort(scores_flat, descending=True)
+                n_survived       = max(1, nSeekerPoints-n_toRepopulate)
+                survived_indices = sorted_indices[:n_survived]
+                repop_indices    = sorted_indices[-n_toRepopulate:]
+
+                n_guided         = int(n_toRepopulate * repop_guideRatio)
+                n_completeRandom = n_toRepopulate-n_guided
+                
+                #[5-2]: Guided Randomization
+                if 0 < n_guided:
+                    #[5-2-1]: Survived mean and STD
+                    survived = seeker['_params_base'][survived_indices]
+                    survived_mean = torch.mean(survived, dim=0)
+                    survived_std  = torch.clamp_min(torch.std(survived, dim=0), min = 1e-4)
+                    
+                    #[5-2-2]: Generate random params using normal distribution
+                    p_guided = torch.normal(mean = survived_mean.repeat(n_guided, 1), 
+                                            std  = survived_std.repeat(n_guided,  1))
+                    p_guided = torch.max(torch.min(p_guided, params_max), params_min)
+                    p_guided = torch.round(p_guided * params_rounding_factors) / params_rounding_factors
+                    p_guided[:, params_fixed_mask] = params_fixed_values[params_fixed_mask]
+                    
+                    #[5-2-3]: Apply new base parameters
+                    target_indices = repop_indices[n_completeRandom:]
+                    seeker['_params_base'][target_indices] = p_guided
+                    seeker['_velocity'][target_indices]    = 0.0
+                    seeker['_momentum'][target_indices]    = 0.0
+
+                #[5-3]: Complete Randomization
+                if 0 < n_completeRandom:
+                    #[5-3-1]: Generate completely random params
+                    p_rand = torch.rand((n_completeRandom, nParameters), device='cuda', dtype=_TORCHDTYPE)
+                    p_rand = p_rand * (params_max - params_min) + params_min
+                    p_rand = torch.round(p_rand * params_rounding_factors) / params_rounding_factors
+                    p_rand[:, params_fixed_mask] = params_fixed_values[params_fixed_mask]
+
+                    #[5-3-2]: Apply new base parameters
+                    seeker['_params_base'][repop_indices[:n_completeRandom]] = p_rand
+                    seeker['_velocity'][repop_indices[:n_completeRandom]]    = 0.0
+                    seeker['_momentum'][repop_indices[:n_completeRandom]]    = 0.0
 
         #[10]: Finally
         return (False, nRepetition_current, currentStep, bestResults_thisRep[-1])

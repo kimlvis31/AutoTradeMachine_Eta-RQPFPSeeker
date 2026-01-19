@@ -7,6 +7,54 @@ PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                 }
 
 #[2]: PPIPS to Process
+PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
+                   'exitFunctionType': 'ROTATIONALGAUSSIAN1',
+                   'leverage':   2,
+                   'pslReentry': False,
+                   'parameterBatchSize': 32*4096,
+                   'paramConfig': [None,   #FSL Immed
+                                   1.0000, #FSL Close
+                                   None,   #Side Offset
+                                   None,   #Theta - SHORT
+                                   None,   #Alpha - SHORT
+                                   None,   #Beta0 - SHORT
+                                   None,   #Beta1 - SHORT
+                                   None,   #Gamma - SHORT
+                                   None,   #Theta - LONG
+                                   None,   #Alpha - LONG
+                                   None,   #Beta0 - LONG
+                                   None,   #Beta1 - LONG
+                                   None    #Gamma - LONG
+                                   ],
+                   'nSeekerPoints':          100,
+                   'nRepetition':            50,
+                   'learningRate':           0.001,
+                   'deltaRatio':             0.10,
+                   'beta_velocity':          0.999,
+                   'beta_momentum':          0.900,
+                   'repopulationRatio':      0.95,
+                   'repopulationInterval':   5,
+                   'repopulationGuideRatio': 0.5,
+                   'scoringSamples':         50,
+                   'scoring':                ('SHARPERATIO', (1e-4, 0.5, None, 1.0)),
+                   'terminationThreshold':   1e-6,
+                  },
+                 ]
+
+#[3]: Result Code to Read
+"""
+ex: _RCODETOREAD = 'rqpfpResult_1768722056' (Result Folder Name)
+"""
+RCODETOREAD = 'rqpfpResult_1768759273'
+
+#[4]: Mode
+"""
+[1]: TEST
+[2]: SEEK
+[3]: READ 
+"""
+MODE = 'SEEK'
+
 """
 PPIPSTOPROCESS = [{'ppips':            'USC10_ppips\\USC10_BTCUSDT',
                    'exitFunctionType': 'CLASSICALSIGNALDEFAULT',
@@ -33,49 +81,3 @@ PPIPSTOPROCESS = [{'ppips':            'USC10_ppips\\USC10_BTCUSDT',
                   },
                  ]
 """
-PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
-                   'exitFunctionType': 'ROTATIONALGAUSSIAN1',
-                   'leverage':   2,
-                   'pslReentry': False,
-                   'parameterBatchSize': 32*4096,
-                   'paramConfig': [None, #FSL Immed
-                                   1.0000,   #FSL Close
-                                   None,   #Side Offset
-                                   None,   #Theta - SHORT
-                                   None,   #Alpha - SHORT
-                                   None,   #Beta0 - SHORT
-                                   None,   #Beta1 - SHORT
-                                   None,   #Gamma - SHORT
-                                   None,   #Theta - LONG
-                                   None,   #Alpha - LONG
-                                   None,   #Beta0 - LONG
-                                   None,   #Beta1 - LONG
-                                   None    #Gamma - LONG
-                                   ],
-                   'nSeekerPoints':        100,
-                   'nRepetition':          50,
-                   'learningRate':         0.001,
-                   'deltaRatio':           0.10,
-                   'beta_velocity':        0.999,
-                   'beta_momentum':        0.900,
-                   'repopulationRatio':    0.95,
-                   'repopulationInterval': 5,
-                   'scoringSamples':       50,
-                   'scoring':              ('SHARPERATIO', (1e-4, 0.5, None, 1.0)),
-                   'terminationThreshold': 1e-6,
-                  },
-                 ]
-
-#[3]: Result Code to Read
-"""
-ex: _RCODETOREAD = 'rqpfpResult_1768722056' (Result Folder Name)
-"""
-RCODETOREAD = 'rqpfpResult_1768759273'
-
-#[4]: Mode
-"""
-[1]: TEST
-[2]: SEEK
-[3]: READ 
-"""
-MODE = 'SEEK'

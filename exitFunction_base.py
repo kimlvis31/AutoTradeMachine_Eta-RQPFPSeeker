@@ -149,7 +149,18 @@ def processBatch_triton_kernel(#Constants
         d_pip_lst     = tl.load(data_pip_lst     + i) 
         d_pip_lsp     = tl.load(data_pip_lsp     + i)
         d_pip_nna     = tl.load(data_pip_nna     + i)
-        d_pip_csf     = tl.load(data_pip_csf     + i) 
+        d_pip_csf     = tl.load(data_pip_csf     + i)
+        d_pip_ivp_base_ptr = data_pip_ivp + (i * data_pip_ivp_stride)
+        d_pip_ivp_0 = tl.load(d_pip_ivp_base_ptr + 0)
+        d_pip_ivp_1 = tl.load(d_pip_ivp_base_ptr + 1)
+        d_pip_ivp_2 = tl.load(d_pip_ivp_base_ptr + 2)
+        d_pip_ivp_3 = tl.load(d_pip_ivp_base_ptr + 3)
+        d_pip_ivp_4 = tl.load(d_pip_ivp_base_ptr + 4)
+        d_pip_ivp_5 = tl.load(d_pip_ivp_base_ptr + 5)
+        d_pip_ivp_6 = tl.load(d_pip_ivp_base_ptr + 6)
+        d_pip_ivp_7 = tl.load(d_pip_ivp_base_ptr + 7)
+        d_pip_ivp_8 = tl.load(d_pip_ivp_base_ptr + 8)
+        d_pip_ivp_9 = tl.load(d_pip_ivp_base_ptr + 9)
         # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -164,25 +175,25 @@ def processBatch_triton_kernel(#Constants
                 rqp_st_cycleContinuation,
                 rqp_st_cycleBeginPrice
             ) = rqpfunctions.rqpf_ROTATIONALGAUSSIAN1.getRQPValue(#Model Parameters <UNIQUE>
-                                                                    mp_delta   = mp_delta,
-                                                                    mp_theta_S = mp_theta_S,
-                                                                    mp_alpha_S = mp_alpha_S,
-                                                                    mp_beta0_S = mp_beta0_S,
-                                                                    mp_beta1_S = mp_beta1_S,
-                                                                    mp_gamma_S = mp_gamma_S,
-                                                                    mp_theta_L = mp_theta_L,
-                                                                    mp_alpha_L = mp_alpha_L,
-                                                                    mp_beta0_L = mp_beta0_L,
-                                                                    mp_beta1_L = mp_beta1_L,
-                                                                    mp_gamma_L = mp_gamma_L,
-                                                                    #Model State Trackers <UNIQUE>
-                                                                    st_pip_csf_prev      = rqp_st_pip_csf_prev,
-                                                                    st_cycleContinuation = rqp_st_cycleContinuation,
-                                                                    st_cycleBeginPrice   = rqp_st_cycleBeginPrice,
-                                                                    #Base Data <COMMON>
-                                                                    data_price_close = d_price_close,
-                                                                    data_pip_csf     = d_pip_csf,
-                                                                    rqpVal_prev      = rqp_prev)
+                                                                  mp_delta   = mp_delta,
+                                                                  mp_theta_S = mp_theta_S,
+                                                                  mp_alpha_S = mp_alpha_S,
+                                                                  mp_beta0_S = mp_beta0_S,
+                                                                  mp_beta1_S = mp_beta1_S,
+                                                                  mp_gamma_S = mp_gamma_S,
+                                                                  mp_theta_L = mp_theta_L,
+                                                                  mp_alpha_L = mp_alpha_L,
+                                                                  mp_beta0_L = mp_beta0_L,
+                                                                  mp_beta1_L = mp_beta1_L,
+                                                                  mp_gamma_L = mp_gamma_L,
+                                                                  #Model State Trackers <UNIQUE>
+                                                                  st_pip_csf_prev      = rqp_st_pip_csf_prev,
+                                                                  st_cycleContinuation = rqp_st_cycleContinuation,
+                                                                  st_cycleBeginPrice   = rqp_st_cycleBeginPrice,
+                                                                  #Base Data <COMMON>
+                                                                  data_price_close = d_price_close,
+                                                                  data_pip_csf     = d_pip_csf,
+                                                                  rqpVal_prev      = rqp_prev)
         elif (MODELNAME == 'CLASSICALSIGNALDEFAULT'):
             (
                 rqp_val,

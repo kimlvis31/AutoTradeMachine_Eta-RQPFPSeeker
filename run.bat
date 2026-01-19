@@ -19,3 +19,4 @@ python main.py
 
 :: [4]: Termination
 echo [System] Program Terminated.
+pause

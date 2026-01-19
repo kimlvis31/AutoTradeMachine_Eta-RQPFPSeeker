@@ -497,7 +497,7 @@ class exitFunction():
         if not (0.0 <= repopulationGuideRatio <= 1.0):       repopulationGuideRatio = 0.5
         #---[2-8]:  repopulationDecayRate
         if type(repopulationDecayRate) not in (float, int): repopulationDecayRate = 0.1
-        if not (0.0 <= repopulationDecayRate <= 1.0):       repopulationDecayRate = 0.1
+        if not (0.0 <  repopulationDecayRate <= 1.0):       repopulationDecayRate = 0.1
         #---[2-9]:  scoring
         if type(scoring) is not tuple or not len(scoring) == 2: scoring = ('SHARPERATIO', (1e-4, 1.0))
         _scoring_type, _scoring_params = scoring

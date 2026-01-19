@@ -35,11 +35,11 @@ PPIPSTOPROCESS = [{'ppips':            'USC10_ppips\\USC10_BTCUSDT',
 """
 PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                    'exitFunctionType': 'ROTATIONALGAUSSIAN1',
-                   'leverage':   3,
+                   'leverage':   2,
                    'pslReentry': False,
                    'parameterBatchSize': 32*4096,
-                   'paramConfig': [1.0000, #FSL Immed
-                                   None,   #FSL Close
+                   'paramConfig': [None, #FSL Immed
+                                   1.0000,   #FSL Close
                                    None,   #Side Offset
                                    None,   #Theta - SHORT
                                    None,   #Alpha - SHORT
@@ -52,8 +52,8 @@ PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                                    None,   #Beta1 - LONG
                                    None    #Gamma - LONG
                                    ],
-                   'nSeekerPoints':        200,
-                   'nRepetition':          10,
+                   'nSeekerPoints':        100,
+                   'nRepetition':          50,
                    'learningRate':         0.001,
                    'deltaRatio':           0.10,
                    'beta_velocity':        0.999,
@@ -61,8 +61,8 @@ PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                    'repopulationRatio':    0.95,
                    'repopulationInterval': 5,
                    'scoringSamples':       50,
-                   'scoring':              ('SHARPERATIO', (1e-4, 0.2, 1.0)),
-                   'terminationThreshold': 1e-5,
+                   'scoring':              ('SHARPERATIO', (1e-4, 0.5, None, 1.0)),
+                   'terminationThreshold': 1e-6,
                   },
                  ]
 
@@ -78,4 +78,4 @@ RCODETOREAD = 'rqpfpResult_1768759273'
 [2]: SEEK
 [3]: READ 
 """
-MODE = 'READ'
+MODE = 'SEEK'

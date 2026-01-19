@@ -9,13 +9,10 @@ import termcolor
 import sys
 import math
 import config
+from rich.console import Console as rConsole
+from rich.live    import Live    as rLive
 
 from exitFunction_base import exitFunction
-
-def removeConsoleLines(nLinesToRemove: int) -> None:
-    for _ in range (nLinesToRemove): 
-        sys.stdout.write("\x1b[1A\x1b[2K")
-        sys.stdout.flush()
 
 if __name__ == "__main__":
     print(termcolor.colored("<RQP MAP PARAMETERS SEEKER PROCESS>\n", 'light_green'))
@@ -189,41 +186,50 @@ if __name__ == "__main__":
                 #Seeker
                 print(f"    - Seeking eFunction Optimized Parameters...")
                 nPrintedLines = None
+                console       = rConsole(highlight=False)
                 complete      = False
                 repIndex_last = None
                 bestResult    = None
                 try:
-                    while not(complete):
-                        #Processing
-                        complete, _repetitionIndex, _step, _bestResult = _eFunction.runSeeker()
-                        _bestResult = {'repetitionIndex': _repetitionIndex,
-                                       'functionParams':  _bestResult[0], 
-                                       'finalBalance':    _bestResult[1],
-                                       'growthRate':      _bestResult[2],
-                                       'volatility':      _bestResult[3],
-                                       'score':           _bestResult[4]}
-                        #Best Result Check
-                        if (bestResult is None) or (bestResult['score'] < _bestResult['score']): 
-                            bestResult = _bestResult
-                            _processes[_pIndex]['bestResult'] = bestResult
-                            _processes[_pIndex]['records'].append(_bestResult)
-                        #Progress Print
-                        if (nPrintedLines is not None): removeConsoleLines(nLinesToRemove = nPrintedLines)
-                        nPrintedLines = 6
-                        print(f"      - Progress:      <Repetition: {_repetitionIndex+1}/{_ptp['nRepetition']}> <Step: {_step}>")
-                        print(f"      - Params:        {bestResult['functionParams']}")
-                        print(f"      - Final Balance: {bestResult['finalBalance']:.8f}")
-                        _growthRate_interval = bestResult['growthRate']
-                        _growthRate_daily    = math.exp(_growthRate_interval*96)-1
-                        _growthRate_monthly  = math.exp(_growthRate_daily   *30.4167)-1
-                        _volatility = bestResult['volatility']
-                        _volatility_tMin_997 = math.exp(-_volatility*3)-1
-                        _volatility_tMax_997 = math.exp( _volatility*3)-1
-                        if   (_growthRate_daily < 0):  print(f"      - Growth Rate:   {_growthRate_interval:.8f} / {termcolor.colored(f"{_growthRate_daily*100:.3f} %", 'light_red')} [Daily] / {termcolor.colored(f"{_growthRate_monthly*100:.3f} %", 'light_red')} [Monthly]")
-                        elif (_growthRate_daily == 0): print(f"      - Growth Rate:   {_growthRate_interval:.8f} / {termcolor.colored(f"{_growthRate_daily*100:.3f} %", None)} [Daily] / {termcolor.colored(f"{_growthRate_monthly*100:.3f} %", None)} [Monthly]")
-                        else:                          print(f"      - Growth Rate:   {_growthRate_interval:.8f} / {termcolor.colored(f"+{_growthRate_daily*100:.3f} %", 'light_green')} [Daily] / {termcolor.colored(f"+{_growthRate_monthly*100:.3f} %", 'light_green')} [Monthly]")
-                        print(f"      - Volatility:    {_volatility:.8f} [Theoretical 99.7%: {termcolor.colored(f"{_volatility_tMin_997*100:.3f} %", 'light_magenta')} / {termcolor.colored(f"+{_volatility_tMax_997*100:.3f} %", 'light_blue')}]")
-                        print(f"      - Score:         {bestResult['score']:.8f}")
+                    with rLive(console = console, refresh_per_second = 4) as rl:
+                        while not(complete):
+                            #Processing
+                            complete, _repetitionIndex, _step, _bestResult = _eFunction.runSeeker()
+                            _bestResult = {'repetitionIndex': _repetitionIndex,
+                                           'functionParams':  _bestResult[0], 
+                                           'finalBalance':    _bestResult[1],
+                                           'growthRate':      _bestResult[2],
+                                           'volatility':      _bestResult[3],
+                                           'score':           _bestResult[4]}
+                            #Best Result Check
+                            if (bestResult is None) or (bestResult['score'] < _bestResult['score']): 
+                                bestResult = _bestResult
+                                _processes[_pIndex]['bestResult'] = bestResult
+                                _processes[_pIndex]['records'].append(_bestResult)
+                            #Progress Print
+                            _growthRate_interval = bestResult['growthRate']
+                            _growthRate_daily    = math.exp(_growthRate_interval*96)-1
+                            _growthRate_monthly  = math.exp(_growthRate_daily   *30.4167)-1
+                            if   (_growthRate_daily < 0):  
+                                _grStr_color = "bright_red"
+                                _grStr_sign  = ""
+                            elif (_growthRate_daily == 0): 
+                                _grStr_color = "white"
+                                _grStr_sign  = ""
+                            else:                          
+                                _grStr_color = "bright_green"
+                                _grStr_sign  = "+"
+                            _volatility = bestResult['volatility']
+                            _volatility_tMin_997 = math.exp(-_volatility*3)-1
+                            _volatility_tMax_997 = math.exp( _volatility*3)-1
+                            ppstr = (f"      - Progress:      <Repetition: {_repetitionIndex+1}/{_ptp['nRepetition']}> <Step: {_step}>\n"
+                                     f"      - Params:        {bestResult['functionParams']}\n"
+                                     f"      - Final Balance: {bestResult['finalBalance']:.8f}\n"
+                                     f"      - Growth Rate:   [{_grStr_color}]{_grStr_sign}{_growthRate_interval:.8f} [default]/ [{_grStr_color}]{_grStr_sign}{_growthRate_daily*100:.3f} % [default][Daily] / [{_grStr_color}]{_grStr_sign}{_growthRate_monthly*100:.3f} % [default][Monthly]\n"
+                                     f"      - Volatility:    {_volatility:.8f} [Theoretical 99.7%: [bright_magenta]{_volatility_tMin_997*100:.3f} % [default]/ [bright_cyan]{_volatility_tMax_997*100:.3f} %]\n[default]"
+                                     f"      - Score:         {bestResult['score']:.8f}"
+                                     )
+                            rl.update(ppstr)
                 except KeyboardInterrupt:
                     print("    - Keyboard Interruption Detected, Terminating...")
 

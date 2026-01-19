@@ -502,17 +502,25 @@ class exitFunction():
             if not (0.0 < _sp_volatility_min):               _sp_volatility_min = 1e-4
             scoring = ('VOLATILITY', (_sp_volatility_min,))
         elif _scoring_type == 'SHARPERATIO':
-            if type(_scoring_params) is not tuple or not len(_scoring_params) == 3: _scoring_params = (1e-4, 1.0, 1.0)
+            if type(_scoring_params) is not tuple or not len(_scoring_params) == 4: _scoring_params = (1e-4, 1.0, 1.0)
             _sp_volatility_min    = _scoring_params[0]
             _sp_volatility_weight = _scoring_params[1]
-            _sp_gainingBonus      = _scoring_params[2]
-            if type(_sp_volatility_min) not in (float, int):    _sp_volatility_min    = 1e-4
-            if not (0.0 < _sp_volatility_min):                  _sp_volatility_min    = 1e-4
+            _sp_volatility_filter = _scoring_params[2]
+            _sp_gainingBonus      = _scoring_params[3]
+            #Volatility Minimum
+            if type(_sp_volatility_min) not in (float, int): _sp_volatility_min = 1e-4
+            if not (0.0 < _sp_volatility_min):               _sp_volatility_min = 1e-4
+            #Volatility Weight
             if type(_sp_volatility_weight) not in (float, int): _sp_volatility_weight = 1.0
             if not (0.0 < _sp_volatility_weight):               _sp_volatility_weight = 1.0
-            if type(_sp_gainingBonus) not in (float, int):      _sp_gainingBonus      = 1.0
-            if not (0.0 <= _sp_gainingBonus):                   _sp_gainingBonus      = 1.0
-            scoring = ('SHARPERATIO', (_sp_volatility_min, _sp_volatility_weight, _sp_gainingBonus))
+            #Volatility Filter
+            if _sp_volatility_filter is not None:
+                if type(_sp_volatility_filter) not in (float, int): _sp_volatility_filter = 0.1
+                if not (0.0 < _sp_volatility_filter):               _sp_volatility_filter = 0.1
+            #Gaining Bonus
+            if type(_sp_gainingBonus) not in (float, int): _sp_gainingBonus = 1.0
+            if not (0.0 <= _sp_gainingBonus):              _sp_gainingBonus = 1.0
+            scoring = ('SHARPERATIO', (_sp_volatility_min, _sp_volatility_weight, _sp_volatility_filter, _sp_gainingBonus))
 
         #---[2-10]: scoringSamples
         if type(scoringSamples) is not int: scoringSamples = 20
@@ -654,11 +662,14 @@ class exitFunction():
         elif (scoringType == 'SHARPERATIO'):
             volatility_min    = scoringParam[0]
             volatility_weight = scoringParam[1]
-            gainingBonus      = scoringParam[2]
+            volatility_filter = scoringParam[2]
+            gainingBonus      = scoringParam[3]
 
             scores = torch.where(1 < balance_finals,
                                  balance_bestFit_growthRates / balance_bestFit_volatilities.clamp_min(min = volatility_min)**volatility_weight + gainingBonus,
                                  balance_bestFit_growthRates)
+            if volatility_filter is not None:
+                scores = torch.where(volatility_filter < balance_bestFit_volatilities, 0.0, scores)
 
         return scores
 

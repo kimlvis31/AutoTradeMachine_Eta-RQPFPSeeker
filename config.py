@@ -7,7 +7,7 @@ PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                 }
 
 #[2]: PPIPS to Process
-PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
+PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                    'exitFunctionType': 'ROTATIONALGAUSSIAN1',
                    'leverage':   1,
                    'pslReentry': False,

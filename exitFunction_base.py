@@ -699,7 +699,10 @@ class exitFunction():
         return scores
 
     def runSeeker(self) -> tuple[bool, tuple]:
-        #[1]: Parameters
+        #[1]: Timer
+        t_cpu_beg_ns = time.perf_counter_ns()
+
+        #[2]: Parameters
         seeker = self.__seeker
         nSeekerPoints = seeker['nSeekerPoints']
         nParameters   = len(seeker['paramConfig'])
@@ -715,29 +718,30 @@ class exitFunction():
         currentStep             = seeker['_currentStep']
         eps = 1e-8
 
-        #[1]: Get Test Parameters & Split into batches
+        #[3]: Get Test Parameters & Split into batches
         params_test, params_plus, params_minus = self.__getTestParams()
         params_test_batches = torch.split(params_test, self.parameterBatchSize)
 
-        #[2]: Process Batches
+
+        #[4]: Process Batches
         bestResults = []
         scores      = []
         t_elapsed_gpu_simulation_total_ms = 0
         for params_test_batch in params_test_batches:
-            #[2-1]: Batch Processing
+            #[4-1]: Batch Processing
             balances, t_elapsed_gpu_ms = self.__performOnParams_Timed(params = params_test_batch)
             (balance_finals, 
              balance_bestFit_growthRates, 
              balance_bestFit_volatilities) = balances
             t_elapsed_gpu_simulation_total_ms += t_elapsed_gpu_ms
             
-            #[2-2]: Scoring
+            #[4-2]: Scoring
             scores_batch = self.__scoreResults(balance_finals               = balance_finals,
                                                balance_bestFit_growthRates  = balance_bestFit_growthRates,
                                                balance_bestFit_volatilities = balance_bestFit_volatilities)
             scores.append(scores_batch)
             
-            #[2-3]: Best Result Record
+            #[4-3]: Best Result Record
             _, max_idx = torch.max(scores_batch, dim = 0)
             max_idx = max_idx.item()
             bestParams = params_test_batch[max_idx].detach().cpu().numpy().tolist()
@@ -748,8 +752,9 @@ class exitFunction():
                           round(float(balance_bestFit_volatilities[max_idx]), 12), #Volatility
                           round(float(scores_batch[max_idx]),                 12)) #Score
             bestResults.append(bestResult)
+        t_processing_paramsSet_ms = t_elapsed_gpu_simulation_total_ms/len(params_test)
 
-        #[3]: Best Reulst Record
+        #[5]: Best Reulst Record
         bestResult          = max(bestResults, key=lambda x: x[4])
         bestResults         = seeker['_bestResults']
         bestResults_thisRep = bestResults[nRepetition_current]
@@ -760,7 +765,7 @@ class exitFunction():
             bestResult_eff = bestResult
         bestResults_thisRep.append(bestResult_eff)
 
-        #[4]: Compute Gradients
+        #[6]: Compute Gradients
         scores      = torch.cat(scores)
         scores_view = scores.view(nSeekerPoints, 2, nParameters)
         dx = torch.diagonal(params_plus-params_minus, dim1=-2, dim2=-1)
@@ -768,7 +773,7 @@ class exitFunction():
         dy = scores_view[:,0,:]-scores_view[:,1,:]
         gradients = dy / (dx + 1e-12)
 
-        #[5]: Update Velocity, Momentum, and Parameters Base
+        #[7]: Update Velocity, Momentum, and Parameters Base
         params_base = seeker['_params_base']
         velocity    = seeker['_velocity']
         momentum    = seeker['_momentum']
@@ -789,33 +794,38 @@ class exitFunction():
         seeker['_momentum']    = momentum
         seeker['_params_base'] = params_base
 
-        #[6]: Compute Best Score Delta EMA
+        #[8]: Compute Best Score Delta EMA
         scoringSamples           = seeker['scoringSamples']
         bestScore                = bestResult[4]
         bestScore_delta_ema      = None
         bestScore_delta_ema_prev = seeker['_bestScore_delta_ema']
         if (scoringSamples+1 <= currentStep):
-            #[6-1]: Calculate SMA (the first value)
+            #[8-1]: Calculate SMA (the first value)
             if bestScore_delta_ema_prev is None:
                 bestScore_deltas_sum = sum((bestResults_thisRep[rIndex][4]/max(bestResults_thisRep[rIndex-1][4], 1e-12))-1 for rIndex in range (1, len(bestResults_thisRep)))
                 bestScore_deltas_sma = bestScore_deltas_sum/scoringSamples
                 bestScore_delta_ema = bestScore_deltas_sma
-            #[6-2]: Calculate EMA
+            #[8-2]: Calculate EMA
             else:
                 bestScore_delta = (bestScore/max(bestResults_thisRep[-2][4], 1e-12))-1
                 ema_k = 2/(scoringSamples+1)
                 bestScore_delta_ema = (bestScore_delta*ema_k) + (bestScore_delta_ema_prev*(1-ema_k))
-            #[6-4]: Update EMA
+            #[8-4]: Update EMA
             seeker['_bestScore_delta_ema'] = bestScore_delta_ema
 
-        #[7]: Check Termination
+        #[9]: Check Termination
         terminationThreshold = seeker['terminationThreshold']
         nRepetition_total    = seeker['nRepetition']
         if bestScore_delta_ema is not None and bestScore_delta_ema < terminationThreshold:
             nRepetition_next             = nRepetition_current + 1
             seeker['_currentRepetition'] = nRepetition_next
             if nRepetition_next == nRepetition_total:
-                return (True, nRepetition_current, currentStep, bestResults_thisRep[-1])
+                return (True, 
+                        nRepetition_current, 
+                        currentStep, 
+                        bestResults_thisRep[-1], 
+                        t_processing_paramsSet_ms,
+                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
             else:
                 #Reset base parameters, velocity, and momentum
                 params_base = torch.rand(size = (nSeekerPoints, nParameters), device = 'cuda', dtype = _TORCHDTYPE)
@@ -829,18 +839,23 @@ class exitFunction():
                 seeker['_currentStep']         = 1
                 seeker['_bestScore_delta_ema'] = None
                 #Return Results
-                return (False, nRepetition_current, currentStep, bestResults_thisRep[-1])
+                return (False, 
+                        nRepetition_current, 
+                        currentStep, 
+                        bestResults_thisRep[-1], 
+                        t_processing_paramsSet_ms,
+                        (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
 
-        #[8]: Step Count Update
+        #[10]: Step Count Update
         seeker['_currentStep'] = currentStep+1
 
-        #[9]: Repopulate (If needed)
+        #[11]: Repopulate (If needed)
         repop_interval   = seeker['repopulationInterval']
         repop_ratio      = seeker['repopulationRatio']
         repop_guideRatio = seeker['repopulationGuideRatio']
         repop_decayRate  = seeker['repopulationDecayRate']
         if (currentStep % repop_interval == 0):
-            #[5-1]: Number of seekers to repopulate (Randomize)
+            #[11-1]: Number of seekers to repopulate (Randomize)
             n_toRepopulate = int(nSeekerPoints * repop_ratio)
             if 0 < n_toRepopulate:
                 scores_flat    = scores_view.view(nSeekerPoints, -1).max(dim=1)[0]
@@ -852,42 +867,47 @@ class exitFunction():
                 n_guided         = int(n_toRepopulate * repop_guideRatio)
                 n_completeRandom = n_toRepopulate-n_guided
                 
-                #[5-2]: Guided Randomization
+                #[11-2]: Guided Randomization
                 if 0 < n_guided:
-                    #[5-2-1]: Survived mean and STD
+                    #[11-2-1]: Survived mean and STD
                     survived = seeker['_params_base'][survived_indices]
                     survived_mean = torch.mean(survived, dim=0)
                     survived_std  = torch.std(survived, dim=0)*math.exp(-(currentStep//repop_interval-1)*repop_decayRate)
                     survived_std  = torch.max(survived_std, 2.0/params_rounding_factors)
                     
-                    #[5-2-2]: Generate random params using normal distribution
+                    #[11-2-2]: Generate random params using normal distribution
                     p_guided = torch.normal(mean = survived_mean.repeat(n_guided, 1), 
                                             std  = survived_std.repeat(n_guided,  1))
                     p_guided = torch.max(torch.min(p_guided, params_max), params_min)
                     p_guided = torch.round(p_guided * params_rounding_factors) / params_rounding_factors
                     p_guided[:, params_fixed_mask] = params_fixed_values[params_fixed_mask]
                     
-                    #[5-2-3]: Apply new base parameters
+                    #[11-2-3]: Apply new base parameters
                     target_indices = repop_indices[n_completeRandom:]
                     seeker['_params_base'][target_indices] = p_guided
                     seeker['_velocity'][target_indices]    = 0.0
                     seeker['_momentum'][target_indices]    = 0.0
 
-                #[5-3]: Complete Randomization
+                #[11-3]: Complete Randomization
                 if 0 < n_completeRandom:
-                    #[5-3-1]: Generate completely random params
+                    #[11-3-1]: Generate completely random params
                     p_rand = torch.rand((n_completeRandom, nParameters), device='cuda', dtype=_TORCHDTYPE)
                     p_rand = p_rand * (params_max - params_min) + params_min
                     p_rand = torch.round(p_rand * params_rounding_factors) / params_rounding_factors
                     p_rand[:, params_fixed_mask] = params_fixed_values[params_fixed_mask]
 
-                    #[5-3-2]: Apply new base parameters
+                    #[11-3-2]: Apply new base parameters
                     seeker['_params_base'][repop_indices[:n_completeRandom]] = p_rand
                     seeker['_velocity'][repop_indices[:n_completeRandom]]    = 0.0
                     seeker['_momentum'][repop_indices[:n_completeRandom]]    = 0.0
 
-        #[10]: Finally
-        return (False, nRepetition_current, currentStep, bestResults_thisRep[-1])
+        #[12]: Finally
+        return (False, 
+                nRepetition_current, 
+                currentStep, 
+                bestResults_thisRep[-1], 
+                t_processing_paramsSet_ms,
+                (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_paramsSet_ms)
 
     def __processBatch(self, params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         #Data

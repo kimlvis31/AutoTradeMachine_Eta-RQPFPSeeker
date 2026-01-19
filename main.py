@@ -204,7 +204,14 @@ if __name__ == "__main__":
                     with rLive(console = console, refresh_per_second = 4) as rl:
                         while not(complete):
                             #Processing
-                            complete, _repetitionIndex, _step, _bestResult = _eFunction.runSeeker()
+                            (
+                                complete, 
+                                _repetitionIndex, 
+                                _step, 
+                                _bestResult, 
+                                t_processing_paramsSet_gpu_ms,
+                                t_processing_paramsSet_cpu_ms
+                             ) = _eFunction.runSeeker()
                             _bestResult = {'repetitionIndex': _repetitionIndex,
                                            'functionParams':  _bestResult[0], 
                                            'finalBalance':    _bestResult[1],
@@ -232,12 +239,13 @@ if __name__ == "__main__":
                             _volatility = bestResult['volatility']
                             _volatility_tMin_997 = math.exp(-_volatility*3)-1
                             _volatility_tMax_997 = math.exp( _volatility*3)-1
-                            ppstr = (f"      - Progress:      <Repetition: {_repetitionIndex+1}/{_ptp['nRepetition']}> <Step: {_step}>\n"
-                                     f"      - Params:        {bestResult['functionParams']}\n"
-                                     f"      - Final Balance: {bestResult['finalBalance']:.8f}\n"
-                                     f"      - Growth Rate:   [{_grStr_color}]{_grStr_sign}{_growthRate_interval:.8f} [default]/ [{_grStr_color}]{_grStr_sign}{_growthRate_daily*100:.3f} % [default][Daily] / [{_grStr_color}]{_grStr_sign}{_growthRate_monthly*100:.3f} % [default][Monthly]\n"
-                                     f"      - Volatility:    {_volatility:.8f} [Theoretical 99.7%: [bright_magenta]{_volatility_tMin_997*100:.3f} % [default]/ [bright_cyan]{_volatility_tMax_997*100:.3f} %]\n[default]"
-                                     f"      - Score:         {bestResult['score']:.8f}"
+                            ppstr = (f"      - Progress:                       <Repetition: {_repetitionIndex+1}/{_ptp['nRepetition']}> <Step: {_step}>\n"
+                                     f"      - Parameter Set Processing Speed: {t_processing_paramsSet_gpu_ms*1e3:.3f} us [GPU], {t_processing_paramsSet_cpu_ms*1e3:.3f} us [CPU]\n"
+                                     f"      - Params:                         {bestResult['functionParams']}\n"
+                                     f"      - Final Balance:                  {bestResult['finalBalance']:.8f}\n"
+                                     f"      - Growth Rate:                    [{_grStr_color}]{_grStr_sign}{_growthRate_interval:.8f} [default]/ [{_grStr_color}]{_grStr_sign}{_growthRate_daily*100:.3f} % [default][Daily] / [{_grStr_color}]{_grStr_sign}{_growthRate_monthly*100:.3f} % [default][Monthly]\n"
+                                     f"      - Volatility:                     {_volatility:.8f} [Theoretical 99.7%: [bright_magenta]{_volatility_tMin_997*100:.3f} % [default]/ [bright_cyan]{_volatility_tMax_997*100:.3f} %]\n[default]"
+                                     f"      - Score:                          {bestResult['score']:.8f}"
                                      )
                             rl.update(ppstr)
                 except KeyboardInterrupt:

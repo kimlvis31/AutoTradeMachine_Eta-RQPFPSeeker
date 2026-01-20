@@ -93,7 +93,21 @@ def processBatch_triton_kernel(#Constants
 
     #Model Parameters and State Trackers <!!! EDIT HERE FOR MODEL ADDITION !!!>
     mp_base_ptr = params_model + (pid * params_model_stride)
-    if (MODELNAME == 'ROTATIONALGAUSSIAN1'):
+    if (MODELNAME == 'CSDEFAULT'):
+        #Parameters
+        mp_delta      = tl.load(mp_base_ptr + 0)
+        mp_strength_S = tl.load(mp_base_ptr + 1)
+        mp_strength_L = tl.load(mp_base_ptr + 2)
+        #State Trackers
+        rqp_st_pip_csf_prev = -1.0
+    elif (MODELNAME == 'SPDDEFAULT'):
+        #Parameters
+        mp_delta      = tl.load(mp_base_ptr + 0)
+        mp_strength_S = tl.load(mp_base_ptr + 1)
+        mp_strength_L = tl.load(mp_base_ptr + 2)
+        #State Trackers
+        rqp_st_pip_csf_prev = -1.0
+    elif (MODELNAME == 'CSPDRG1'):
         #Parameters
         mp_delta   = tl.load(mp_base_ptr + 0)
         mp_theta_S = tl.load(mp_base_ptr + 1)
@@ -110,13 +124,6 @@ def processBatch_triton_kernel(#Constants
         rqp_st_pip_csf_prev      = -1.0
         rqp_st_cycleContinuation = -1.0
         rqp_st_cycleBeginPrice   = 0.0
-    elif (MODELNAME == 'CLASSICALSIGNALDEFAULT'):
-        #Parameters
-        mp_delta      = tl.load(mp_base_ptr + 0)
-        mp_strength_S = tl.load(mp_base_ptr + 1)
-        mp_strength_L = tl.load(mp_base_ptr + 2)
-        #State Trackers
-        rqp_st_pip_csf_prev = -1.0
 
     # RQP Values
     rqp_val  = 0.0
@@ -168,45 +175,58 @@ def processBatch_triton_kernel(#Constants
 
 
         #[2]: RQP Values  <!!! EDIT HERE FOR MODEL ADDITION !!!> --------------------------------------------------------------------------------------------------------------------------------------
-        if (MODELNAME == 'ROTATIONALGAUSSIAN1'):
+        if (MODELNAME == 'CSDEFAULT'):
+            (
+                rqp_val,
+                rqp_st_pip_csf_prev,
+            ) = rqpfunctions.rqpf_CSDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
+                                                        mp_delta      = mp_delta,
+                                                        mp_strength_S = mp_strength_S,
+                                                        mp_strength_L = mp_strength_L,
+                                                        #Model State Trackers <UNIQUE>
+                                                        st_pip_csf_prev = rqp_st_pip_csf_prev,
+                                                        #Base Data <COMMON>
+                                                        data_pip_csf = d_pip_csf,
+                                                        rqpVal_prev  = rqp_prev)
+        elif (MODELNAME == 'SPDDEFAULT'):
+            (
+                rqp_val,
+                rqp_st_pip_csf_prev,
+            ) = rqpfunctions.rqpf_SPDDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
+                                                         mp_delta      = mp_delta,
+                                                         mp_strength_S = mp_strength_S,
+                                                         mp_strength_L = mp_strength_L,
+                                                         #Model State Trackers <UNIQUE>
+                                                         st_pip_csf_prev = rqp_st_pip_csf_prev,
+                                                         #Base Data <COMMON>
+                                                         data_pip_csf = d_pip_csf,
+                                                         rqpVal_prev  = rqp_prev)
+        if (MODELNAME == 'CSPDRG1'):
             (
                 rqp_val,
                 rqp_st_pip_csf_prev,
                 rqp_st_cycleContinuation,
                 rqp_st_cycleBeginPrice
-            ) = rqpfunctions.rqpf_ROTATIONALGAUSSIAN1.getRQPValue(#Model Parameters <UNIQUE>
-                                                                  mp_delta   = mp_delta,
-                                                                  mp_theta_S = mp_theta_S,
-                                                                  mp_alpha_S = mp_alpha_S,
-                                                                  mp_beta0_S = mp_beta0_S,
-                                                                  mp_beta1_S = mp_beta1_S,
-                                                                  mp_gamma_S = mp_gamma_S,
-                                                                  mp_theta_L = mp_theta_L,
-                                                                  mp_alpha_L = mp_alpha_L,
-                                                                  mp_beta0_L = mp_beta0_L,
-                                                                  mp_beta1_L = mp_beta1_L,
-                                                                  mp_gamma_L = mp_gamma_L,
-                                                                  #Model State Trackers <UNIQUE>
-                                                                  st_pip_csf_prev      = rqp_st_pip_csf_prev,
-                                                                  st_cycleContinuation = rqp_st_cycleContinuation,
-                                                                  st_cycleBeginPrice   = rqp_st_cycleBeginPrice,
-                                                                  #Base Data <COMMON>
-                                                                  data_price_close = d_price_close,
-                                                                  data_pip_csf     = d_pip_csf,
-                                                                  rqpVal_prev      = rqp_prev)
-        elif (MODELNAME == 'CLASSICALSIGNALDEFAULT'):
-            (
-                rqp_val,
-                rqp_st_pip_csf_prev,
-            ) = rqpfunctions.rqpf_CLASSICALSIGNALDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
-                                                                     mp_delta      = mp_delta,
-                                                                     mp_strength_S = mp_strength_S,
-                                                                     mp_strength_L = mp_strength_L,
-                                                                     #Model State Trackers <UNIQUE>
-                                                                     st_pip_csf_prev = rqp_st_pip_csf_prev,
-                                                                     #Base Data <COMMON>
-                                                                     data_pip_csf = d_pip_csf,
-                                                                     rqpVal_prev  = rqp_prev)
+            ) = rqpfunctions.rqpf_CSPDRG1.getRQPValue(#Model Parameters <UNIQUE>
+                                                      mp_delta   = mp_delta,
+                                                      mp_theta_S = mp_theta_S,
+                                                      mp_alpha_S = mp_alpha_S,
+                                                      mp_beta0_S = mp_beta0_S,
+                                                      mp_beta1_S = mp_beta1_S,
+                                                      mp_gamma_S = mp_gamma_S,
+                                                      mp_theta_L = mp_theta_L,
+                                                      mp_alpha_L = mp_alpha_L,
+                                                      mp_beta0_L = mp_beta0_L,
+                                                      mp_beta1_L = mp_beta1_L,
+                                                      mp_gamma_L = mp_gamma_L,
+                                                      #Model State Trackers <UNIQUE>
+                                                      st_pip_csf_prev      = rqp_st_pip_csf_prev,
+                                                      st_cycleContinuation = rqp_st_cycleContinuation,
+                                                      st_cycleBeginPrice   = rqp_st_cycleBeginPrice,
+                                                      #Base Data <COMMON>
+                                                      data_price_close = d_price_close,
+                                                      data_pip_csf     = d_pip_csf,
+                                                      rqpVal_prev      = rqp_prev)
 
         rqp_val = tl.floor(rqp_val*1e4+0.5)*1e-4
 

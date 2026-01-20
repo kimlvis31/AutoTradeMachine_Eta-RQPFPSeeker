@@ -7,25 +7,16 @@ PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                 }
 
 #[2]: PPIPS to Process
-PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
-                   'exitFunctionType': 'ROTATIONALGAUSSIAN1',
+PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
+                   'exitFunctionType': 'CSDEFAULT',
                    'leverage':   1,
                    'pslReentry': False,
                    'parameterBatchSize': 32*4096,
-                   'paramConfig': [None,   #FSL Immed
-                                   1.0000, #FSL Close
-                                   None,   #Side Offset
-                                   None,   #Theta - SHORT
-                                   None,   #Alpha - SHORT
-                                   None,   #Beta0 - SHORT
-                                   None,   #Beta1 - SHORT
-                                   None,   #Gamma - SHORT
-                                   None,   #Theta - LONG
-                                   None,   #Alpha - LONG
-                                   None,   #Beta0 - LONG
-                                   None,   #Beta1 - LONG
-                                   None    #Gamma - LONG
-                                   ],
+                   'paramConfig': [None,
+                                   1.0000,
+                                   None,
+                                   None,
+                                   None],
                    'nSeekerPoints':          100,
                    'nRepetition':            50,
                    'learningRate':           0.001,
@@ -37,10 +28,28 @@ PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
                    'repopulationGuideRatio': 0.5,
                    'repopulationDecayRate':  0.1,
                    'scoringSamples':         50,
-                   'scoring':                ('SHARPERATIO', (1e-4, 0.2, 0.1, 1.0)),
+                   'scoring':                ('SHARPERATIO', (1e-4, 0.2, None, 1.0)),
                    'terminationThreshold':   1e-6,
                   },
                  ]
+
+
+"""
+'paramConfig': [None,   #FSL Immed
+                1.0000, #FSL Close
+                None,   #Side Offset
+                None,   #Theta - SHORT
+                None,   #Alpha - SHORT
+                None,   #Beta0 - SHORT
+                None,   #Beta1 - SHORT
+                None,   #Gamma - SHORT
+                None,   #Theta - LONG
+                None,   #Alpha - LONG
+                None,   #Beta0 - LONG
+                None,   #Beta1 - LONG
+                None    #Gamma - LONG
+                ],
+"""
 
 #[3]: Result Code to Read
 """

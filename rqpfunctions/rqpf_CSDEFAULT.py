@@ -38,7 +38,7 @@ def getRQPValue(#Model Parameters <UNIQUE>
     #---Inputs
     width = tl.where(isShort_now, mp_delta+1.0, 1.0-mp_delta)
     dist  = tl.abs(data_pip_csf-mp_delta)
-    rqpVal_abs = dist/tl.maximum(width, 1e-9)*mp_strength_eff
+    rqpVal_abs = tl.maximum(1-(dist/tl.maximum(width, 1e-9)), 0.0)*mp_strength_eff
     rqpVal_abs = tl.where(width == 0.0, 0.0, rqpVal_abs)
     #---Cyclic Minimum
     rqpVal_abs = tl.where(cycleReset, rqpVal_abs, tl.minimum(rqpVal_abs, tl.abs(rqpVal_prev)))

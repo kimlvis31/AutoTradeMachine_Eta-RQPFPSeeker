@@ -552,32 +552,19 @@ class exitFunction():
         if _scoring_type not in ('FINALBALANCE', 'GROWTHRATE', 'VOLATILITY', 'SHARPERATIO'): scoring = ('SHARPERATIO', (1e-4, 1.0))
         if   _scoring_type == 'FINALBALANCE': scoring = ('FINALBALANCE', None)
         elif _scoring_type == 'GROWTHRATE':   scoring = ('GROWTHRATE',   None)
-        elif _scoring_type == 'VOLATILITY':
-            if type(_scoring_params) is not tuple or not len(_scoring_params) == 1: _scoring_params = (1e-4,)
-            _sp_volatility_min = _scoring_params[0]
-            if type(_sp_volatility_min) not in (float, int): _sp_volatility_min = 1e-4
-            if not (0.0 < _sp_volatility_min):               _sp_volatility_min = 1e-4
-            scoring = ('VOLATILITY', (_sp_volatility_min,))
+        elif _scoring_type == 'VOLATILITY':   scoring = ('VOLATILITY',   None)
         elif _scoring_type == 'SHARPERATIO':
-            if type(_scoring_params) is not tuple or not len(_scoring_params) == 4: _scoring_params = (1e-4, 1.0, 1.0)
-            _sp_volatility_min    = _scoring_params[0]
-            _sp_volatility_weight = _scoring_params[1]
-            _sp_volatility_filter = _scoring_params[2]
-            _sp_gainingBonus      = _scoring_params[3]
-            #Volatility Minimum
-            if type(_sp_volatility_min) not in (float, int): _sp_volatility_min = 1e-4
-            if not (0.0 < _sp_volatility_min):               _sp_volatility_min = 1e-4
+            if type(_scoring_params) is not tuple or not len(_scoring_params) == 2: _scoring_params = (1.0, None)
+            _sp_volatility_weight = _scoring_params[0]
+            _sp_maxMDD            = _scoring_params[1]
             #Volatility Weight
             if type(_sp_volatility_weight) not in (float, int): _sp_volatility_weight = 1.0
-            if not (0.0 < _sp_volatility_weight):               _sp_volatility_weight = 1.0
+            if not (0.0 <= _sp_volatility_weight):              _sp_volatility_weight = 1.0
             #Volatility Filter
-            if _sp_volatility_filter is not None:
-                if type(_sp_volatility_filter) not in (float, int): _sp_volatility_filter = 0.1
-                if not (0.0 < _sp_volatility_filter):               _sp_volatility_filter = 0.1
-            #Gaining Bonus
-            if type(_sp_gainingBonus) not in (float, int): _sp_gainingBonus = 1.0
-            if not (0.0 <= _sp_gainingBonus):              _sp_gainingBonus = 1.0
-            scoring = ('SHARPERATIO', (_sp_volatility_min, _sp_volatility_weight, _sp_volatility_filter, _sp_gainingBonus))
+            if _sp_maxMDD is not None:
+                if type(_sp_maxMDD) not in (float, int): _sp_maxMDD = None
+                if not (0.0 < _sp_maxMDD <= 1.00):       _sp_maxMDD = None
+            scoring = ('SHARPERATIO', (_sp_volatility_weight, _sp_maxMDD))
 
         #---[2-10]: scoringSamples
         if type(scoringSamples) is not int: scoringSamples = 20
@@ -706,35 +693,30 @@ class exitFunction():
     def __scoreResults(self, balance_finals, balance_bestFit_growthRates, balance_bestFit_volatilities, nTrades):
         scoringType, scoringParam = self.__seeker['scoring']
         #[1]: TYPE - 'FINALBALANCE'
-        if (scoringType == 'FINALBALANCE'): 
-            scores = balance_finals
+        if (scoringType == 'FINALBALANCE'):
+            scores = torch.atan(balance_finals)/torch.pi*2
 
         #[2]: TYPE - 'GROWTHRATE'
-        elif (scoringType == 'GROWTHRATE'):   
-            scores = balance_bestFit_growthRates
+        elif (scoringType == 'GROWTHRATE'):
+            scores = torch.atan(balance_bestFit_growthRates)/torch.pi+0.5
 
         #[3]: TYPE - 'VOLATILITY'
         elif (scoringType == 'VOLATILITY'):
-            volatility_min = scoringParam[0]
-
-            scores = 1 / balance_bestFit_volatilities.clamp_min(min = volatility_min)
+            scores = torch.atan(nTrades/balance_bestFit_volatilities.clamp_min(min = 1e-12))/torch.pi+0.5
 
         #[4]: TYPE - 'SHARPERATIO'
         elif (scoringType == 'SHARPERATIO'):
-            volatility_min    = scoringParam[0]
-            volatility_weight = scoringParam[1]
-            volatility_filter = scoringParam[2]
-            gainingBonus      = scoringParam[3]
+            volatility_weight = scoringParam[0] #Volatility Influence Weight
+            maxMDD            = scoringParam[1] #Maximum Draw Down
 
-            scores = torch.where(1 < balance_finals,
-                                 balance_bestFit_growthRates / balance_bestFit_volatilities.clamp_min(min = volatility_min)**volatility_weight + gainingBonus,
-                                 balance_bestFit_growthRates)
-            if volatility_filter is not None:
-                scores = torch.where(volatility_filter < balance_bestFit_volatilities, 0.0, scores)
-        
-        #[5]: No Trade Filtering
-        scores = torch.where(nTrades == 0, -1, scores)
+            scores_gr  = torch.atan(balance_bestFit_growthRates)/torch.pi+0.5
+            scores_vol = torch.atan(torch.sqrt(nTrades/balance_bestFit_volatilities.clamp_min(min = 1e-4)))/torch.pi+0.5
+            scores = scores_gr*(scores_vol**volatility_weight)
+            if maxMDD is not None:
+                volatility_tMin_997 = torch.exp(-balance_bestFit_volatilities*3)-1
+                scores = torch.where(maxMDD < -volatility_tMin_997, 0.0, scores)
 
+        #[6]: Finally
         return scores
 
     def runSeeker(self) -> tuple[bool, tuple]:

@@ -2,7 +2,7 @@
 PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                  'exitFunctionType': 'SPDDEFAULT',
                  'leverage':         1,
-                 'params':           (1.0000, 1.0000, -0.267290, 0.517129, 0.737667, -0.999855, 1.000000, 0.355110), #(1.0, 1.0, 0.000000, 0.057000, 0.123000, 0.074000, 0.000200, 10.0, 0.007200, 0.608000, 0.213700, 0.000000, 10.0),
+                 'params':           (0.0001, 1.0, 0.000000, 1.000000, 0.05000, 0.000000, 1.000000, 0.05000), #(1.0, 1.0, 0.000000, 0.057000, 0.123000, 0.074000, 0.000200, 10.0, 0.007200, 0.608000, 0.213700, 0.000000, 10.0),
                  'pslReentry':       False,
                 }
 
@@ -12,7 +12,7 @@ PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                    'leverage':   1,
                    'pslReentry': False,
                    'parameterBatchSize': 32*4096,
-                   'paramConfig': [0.01,
+                   'paramConfig': [None,
                                    1.0000,
                                    None,
                                    None,
@@ -21,7 +21,7 @@ PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
                                    None,
                                    None],
                    'nSeekerPoints':          100,
-                   'nRepetition':            50,
+                   'nRepetition':            10,
                    'learningRate':           0.001,
                    'deltaRatio':             0.10,
                    'beta_velocity':          0.999,
@@ -66,4 +66,4 @@ RCODETOREAD = 'rqpfpResult_1768759273'
 [2]: SEEK
 [3]: READ 
 """
-MODE = 'SEEK'
+MODE = 'TEST'

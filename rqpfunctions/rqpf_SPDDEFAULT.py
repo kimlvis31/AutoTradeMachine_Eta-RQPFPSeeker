@@ -47,6 +47,8 @@ def getRQPValue(#Model Parameters <UNIQUE>
     mp_delta_eff    = tl.where(isShort_now, mp_delta_S,    mp_delta_L)
     mp_strength_eff = tl.where(isShort_now, mp_strength_S, mp_strength_L)
     mp_length_eff   = tl.where(isShort_now, mp_length_S,   mp_length_L)
+
+
     #---RQP Value
     pd = tl.where(isShort_now, 1-data_price_close/data_pip_lsp, data_price_close/data_pip_lsp-1)
     rqpVal_abs = tl.where(mp_delta_eff <= pd,
@@ -55,6 +57,8 @@ def getRQPValue(#Model Parameters <UNIQUE>
     rqpVal_abs = tl.where(mp_length_eff == 0.0, 0.0, rqpVal_abs)
     rqpVal_abs = tl.where(cycleReset, rqpVal_abs, tl.minimum(rqpVal_abs, tl.abs(rqpVal_prev)))
     rqpVal = tl.where(isShort_now, -rqpVal_abs, rqpVal_abs)
+
+    tl.device_print("", (1-(pd-mp_delta_eff)/tl.maximum(mp_length_eff, 1e-9))*mp_strength_eff)
 
     #States Update
     st_pip_lst_prev = data_pip_lst

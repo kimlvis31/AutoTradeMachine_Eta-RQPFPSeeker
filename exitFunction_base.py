@@ -267,9 +267,9 @@ def processBatch_triton_kernel(#Constants
         hit_fslImmed    = position_has & ((position_side*price_worst)   <= (position_side*price_act_FSLImmed))
         hit_fslClose    = position_has & ((position_side*d_price_close) <= (position_side*price_act_FSLClose))
 
-        #Execution Price
-        price_execution = tl.where(hit_fslImmed,    price_act_FSLImmed, d_price_close)
-        price_execution = tl.where(hit_liquidation, price_liquidation,  price_execution)
+        #Exit Execution Price
+        price_exit_execution = tl.where(hit_fslImmed,    price_act_FSLImmed, d_price_close)
+        price_exit_execution = tl.where(hit_liquidation, price_liquidation,  price_exit_execution)
         
         #Quantity Reduce
         balance_committed = tl.abs(quantity)  * entryPrice
@@ -283,8 +283,8 @@ def processBatch_triton_kernel(#Constants
         quantity_new = tl.where(status_forceExit | status_positionReversal, 0.0,                                             quantity_new)
 
         quantity_delta = quantity_new - quantity
-        profit         = quantity_delta * (entryPrice-price_execution)
-        fee            = tl.abs(quantity_delta) * price_execution * tradingFee
+        profit         = quantity_delta * (entryPrice-price_exit_execution)
+        fee            = tl.abs(quantity_delta) * price_exit_execution * tradingFee
 
         #Wallet Balance Post-Exit Update
         balance_wallet = balance_wallet + (profit - fee) * leverage
@@ -306,17 +306,17 @@ def processBatch_triton_kernel(#Constants
         balance_toCommit_entry = tl.maximum(balance_toCommit-balance_committed, 0.0)
 
         quantity_entry = tl.where(forceExited == 0.0,
-                                  (balance_toCommit_entry / price_execution)*tl.where(rqp_val < 0, -1.0, 1.0),
+                                  (balance_toCommit_entry / d_price_close)*tl.where(rqp_val < 0, -1.0, 1.0),
                                   0.0)
         quantity_final = quantity_new + quantity_entry
         
         #Entry Price Update
         entryPrice_new = tl.where(quantity_final == 0.0, 
                                   0.0, 
-                                  (tl.abs(quantity_new)*entryPrice + tl.abs(quantity_entry)*price_execution) / tl.maximum(tl.abs(quantity_final), 1e-6))
+                                  (tl.abs(quantity_new)*entryPrice + tl.abs(quantity_entry)*d_price_close) / tl.maximum(tl.abs(quantity_final), 1e-6))
         
         #Wallet Balance Post-Entry Update
-        fee = tl.abs(quantity_entry) * price_execution * tradingFee
+        fee = tl.abs(quantity_entry) * d_price_close * tradingFee
         balance_wallet = balance_wallet - fee * leverage
         balance_wallet = tl.maximum(balance_wallet, 0.0)
 

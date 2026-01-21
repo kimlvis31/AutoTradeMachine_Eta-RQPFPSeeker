@@ -79,6 +79,7 @@ def processBatch_triton_kernel(#Constants
                                 balance_wallet_history,
                                 balance_margin_history,
                                 balance_ftIndexes,
+                                nTrades_rb,
                                 #Sizes
                                 size_paramsBatch: tl.constexpr,
                                 size_dataLen:     tl.constexpr,
@@ -102,11 +103,15 @@ def processBatch_triton_kernel(#Constants
         rqp_st_pip_csf_prev = -1.0
     elif (MODELNAME == 'SPDDEFAULT'):
         #Parameters
-        mp_delta      = tl.load(mp_base_ptr + 0)
+        mp_delta_S    = tl.load(mp_base_ptr + 0)
         mp_strength_S = tl.load(mp_base_ptr + 1)
-        mp_strength_L = tl.load(mp_base_ptr + 2)
+        mp_length_S   = tl.load(mp_base_ptr + 2)
+        mp_delta_L    = tl.load(mp_base_ptr + 3)
+        mp_strength_L = tl.load(mp_base_ptr + 4)
+        mp_length_L   = tl.load(mp_base_ptr + 5)
         #State Trackers
-        rqp_st_pip_csf_prev = -1.0
+        rqp_st_pip_lst_prev = -1.0
+        rqp_st_pip_lsp_prev = -1.0
     elif (MODELNAME == 'CSPDRG1'):
         #Parameters
         mp_delta   = tl.load(mp_base_ptr + 0)
@@ -139,6 +144,7 @@ def processBatch_triton_kernel(#Constants
     quantity          = 0.0
     entryPrice        = 0.0
     forceExited       = 0.0
+    nTrades           = 0
     #Balance Trend
     bt_sum         = 0.0
     bt_sum_squared = 0.0
@@ -191,17 +197,24 @@ def processBatch_triton_kernel(#Constants
         elif (MODELNAME == 'SPDDEFAULT'):
             (
                 rqp_val,
-                rqp_st_pip_csf_prev,
+                rqp_st_pip_lst_prev,
+                rqp_st_pip_lsp_prev
             ) = rqpfunctions.rqpf_SPDDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
-                                                         mp_delta      = mp_delta,
+                                                         mp_delta_S    = mp_delta_S,
                                                          mp_strength_S = mp_strength_S,
+                                                         mp_length_S   = mp_length_S,
+                                                         mp_delta_L    = mp_delta_L,
                                                          mp_strength_L = mp_strength_L,
+                                                         mp_length_L   = mp_length_L,
                                                          #Model State Trackers <UNIQUE>
-                                                         st_pip_csf_prev = rqp_st_pip_csf_prev,
+                                                         st_pip_lst_prev = rqp_st_pip_lst_prev,
+                                                         st_pip_lsp_prev = rqp_st_pip_lsp_prev,
                                                          #Base Data <COMMON>
-                                                         data_pip_csf = d_pip_csf,
+                                                         data_price_close = d_price_close,
+                                                         data_pip_lst = d_pip_lst,
+                                                         data_pip_lsp = d_pip_lsp,
                                                          rqpVal_prev  = rqp_prev)
-        if (MODELNAME == 'CSPDRG1'):
+        elif (MODELNAME == 'CSPDRG1'):
             (
                 rqp_val,
                 rqp_st_pip_csf_prev,
@@ -229,7 +242,6 @@ def processBatch_triton_kernel(#Constants
                                                       rqpVal_prev      = rqp_prev)
 
         rqp_val = tl.floor(rqp_val*1e4+0.5)*1e-4
-
         # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -314,8 +326,10 @@ def processBatch_triton_kernel(#Constants
 
         #Update State
         balance_ftIndex = tl.where((balance_ftIndex == -1) & (quantity_final != quantity), i, balance_ftIndex)
+        nTrades         = tl.where(quantity_final != quantity, nTrades+1, nTrades)
         quantity   = quantity_final
         entryPrice = entryPrice_new
+
         # endregion
         # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -368,6 +382,7 @@ def processBatch_triton_kernel(#Constants
     tl.store(balance_bestFit_volatilities + pid, bt_volatility)
     tl.store(balance_finals               + pid, balance_wallet)
     tl.store(balance_ftIndexes            + pid, balance_ftIndex)
+    tl.store(nTrades_rb                   + pid, nTrades)
 # =======================================================================================================================================================================================================================================================
 
 
@@ -687,7 +702,7 @@ class exitFunction():
         #[5]: Return
         return params_test, params_plus, params_minus
     
-    def __scoreResults(self, balance_finals, balance_bestFit_growthRates, balance_bestFit_volatilities):
+    def __scoreResults(self, balance_finals, balance_bestFit_growthRates, balance_bestFit_volatilities, nTrades):
         scoringType, scoringParam = self.__seeker['scoring']
         #[1]: TYPE - 'FINALBALANCE'
         if (scoringType == 'FINALBALANCE'): 
@@ -715,6 +730,9 @@ class exitFunction():
                                  balance_bestFit_growthRates)
             if volatility_filter is not None:
                 scores = torch.where(volatility_filter < balance_bestFit_volatilities, 0.0, scores)
+        
+        #[5]: No Trade Filtering
+        scores = torch.where(nTrades == 0, -1, scores)
 
         return scores
 
@@ -752,13 +770,15 @@ class exitFunction():
             balances, t_elapsed_gpu_ms = self.__performOnParams_Timed(params = params_test_batch)
             (balance_finals, 
              balance_bestFit_growthRates, 
-             balance_bestFit_volatilities) = balances
+             balance_bestFit_volatilities,
+             nTrades) = balances
             t_elapsed_gpu_simulation_total_ms += t_elapsed_gpu_ms
             
             #[4-2]: Scoring
             scores_batch = self.__scoreResults(balance_finals               = balance_finals,
                                                balance_bestFit_growthRates  = balance_bestFit_growthRates,
-                                               balance_bestFit_volatilities = balance_bestFit_volatilities)
+                                               balance_bestFit_volatilities = balance_bestFit_volatilities,
+                                               nTrades                      = nTrades)
             scores.append(scores_batch)
             
             #[4-3]: Best Result Record
@@ -770,7 +790,8 @@ class exitFunction():
                           round(float(balance_finals[max_idx]),               12), #Final Wallet Balance
                           round(float(balance_bestFit_growthRates[max_idx]),  12), #Growth Rate
                           round(float(balance_bestFit_volatilities[max_idx]), 12), #Volatility
-                          round(float(scores_batch[max_idx]),                 12)) #Score
+                          round(float(scores_batch[max_idx]),                 12), #Score
+                          round(int(nTrades[max_idx])))                            #nTrades
             bestResults.append(bestResult)
         t_processing_sim_paramsSet_ms = t_elapsed_gpu_simulation_total_ms/len(params_test)
 
@@ -953,6 +974,7 @@ class exitFunction():
             _balance_wallet_history  = torch.empty(size = (_size_paramsBatch, self.__data_nValidSamples), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
             _balance_margin_history  = torch.empty(size = (_size_paramsBatch, self.__data_nValidSamples), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
         _balance_ftIndexes = torch.full(size = (_size_paramsBatch,), fill_value = -1, device = 'cuda', dtype = torch.int32, requires_grad = False)
+        _nTrades = torch.zeros(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
 
         #Processing
         _grid = (_size_paramsBatch,)
@@ -986,6 +1008,7 @@ class exitFunction():
                                           balance_wallet_history       = _balance_wallet_history,
                                           balance_margin_history       = _balance_margin_history,
                                           balance_ftIndexes            = _balance_ftIndexes,
+                                          nTrades_rb                   = _nTrades,
                                           #Sizes
                                           size_paramsBatch = _size_paramsBatch,
                                           size_dataLen     = _size_dataLen,
@@ -999,7 +1022,7 @@ class exitFunction():
                                          )
 
         #Return Result
-        if self.isSeeker: return _balance_finals, _balance_bestFit_growthRates, _balance_bestFit_volatilities
+        if self.isSeeker: return _balance_finals, _balance_bestFit_growthRates, _balance_bestFit_volatilities, _nTrades
         else:
             _indexGrid         = torch.arange(self.__data_nValidSamples, device='cuda', dtype=_TORCHDTYPE).unsqueeze(0)
             _ftIndexes_bc      = _balance_ftIndexes.unsqueeze(1)
@@ -1007,7 +1030,7 @@ class exitFunction():
             _balance_bestFit_x = _indexGrid - _ftIndexes_bc
             _balance_bestFit_history_raw = torch.exp(_balance_bestFit_growthRates.unsqueeze(1)*_balance_bestFit_x + _balance_bestFit_intercepts.unsqueeze(1))
             _balance_bestFit_history = torch.where(_mask_validRegion, _balance_bestFit_history_raw, float('nan'))
-            return _balance_wallet_history, _balance_margin_history, _balance_bestFit_history, _balance_bestFit_growthRates, _balance_bestFit_volatilities
+            return _balance_wallet_history, _balance_margin_history, _balance_bestFit_history, _balance_bestFit_growthRates, _balance_bestFit_volatilities, _nTrades
 
     @BPST_Timer
     def __performOnParams_Timed(self, params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

@@ -1,19 +1,22 @@
 #[1]: Parameer Test
 PARAMETERTEST = {'ppips':            'USC12_ppips\\USC12_BTCUSDT',
-                 'exitFunctionType': 'ROTATIONALGAUSSIAN1',
+                 'exitFunctionType': 'SPDDEFAULT',
                  'leverage':         1,
-                 'params':           (1.0, 1.0, 0.3019, 0.636598, 0.045564, 0.132109, 0.200677, 10.0, 0.193345, 0.573387, 0.163673, 0.842677, 10.0), #(1.0, 1.0, 0.000000, 0.057000, 0.123000, 0.074000, 0.000200, 10.0, 0.007200, 0.608000, 0.213700, 0.000000, 10.0),
-                 'pslReentry':       True,
+                 'params':           (1.0000, 1.0000, -0.267290, 0.517129, 0.737667, -0.999855, 1.000000, 0.355110), #(1.0, 1.0, 0.000000, 0.057000, 0.123000, 0.074000, 0.000200, 10.0, 0.007200, 0.608000, 0.213700, 0.000000, 10.0),
+                 'pslReentry':       False,
                 }
 
 #[2]: PPIPS to Process
 PPIPSTOPROCESS = [{'ppips':            'USC12_ppips\\USC12_BTCUSDT',
-                   'exitFunctionType': 'CSDEFAULT',
+                   'exitFunctionType': 'SPDDEFAULT',
                    'leverage':   1,
                    'pslReentry': False,
                    'parameterBatchSize': 32*4096,
-                   'paramConfig': [None,
+                   'paramConfig': [0.01,
                                    1.0000,
+                                   None,
+                                   None,
+                                   None,
                                    None,
                                    None,
                                    None],

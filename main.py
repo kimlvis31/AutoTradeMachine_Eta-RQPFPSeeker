@@ -57,6 +57,7 @@ if __name__ == "__main__":
             _balance_bestFit_history,
             _balance_bestFit_growthRates,
             _balance_bestFit_volatilities,
+            _nTrades
         ) = _eFunction.performOnParams(params = [PARAMETERTEST['params'],])
 
         #Matplot Drawing
@@ -77,6 +78,7 @@ if __name__ == "__main__":
         elif (_growthRate_daily == 0): print(f" * Growth Rate:   {_growthRate_interval:.8f} / {termcolor.colored(f"{_growthRate_daily*100:.3f} %", None)} [Daily] / {termcolor.colored(f"{_growthRate_monthly*100:.3f} %", None)} [Monthly]")
         else:                          print(f" * Growth Rate:   {_growthRate_interval:.8f} / {termcolor.colored(f"+{_growthRate_daily*100:.3f} %", 'light_green')} [Daily] / {termcolor.colored(f"+{_growthRate_monthly*100:.3f} %", 'light_green')} [Monthly]")
         print(f" * Volatility:    {_volatility:.8f} [Theoretical 99.7%: {termcolor.colored(f"{_volatility_tMin_997*100:.3f} %", 'light_magenta')} / {termcolor.colored(f"+{_volatility_tMax_997*100:.3f} %", 'light_blue')}]")
+        print(f" * nTrades:       {int(_nTrades[0].item())}")
 
         #Matplot Show
         matplotlib.pyplot.title(f"[PARAMETER TEST] Wallet & Margin Balance History")
@@ -216,7 +218,8 @@ if __name__ == "__main__":
                                            'finalBalance':    _bestResult[1],
                                            'growthRate':      _bestResult[2],
                                            'volatility':      _bestResult[3],
-                                           'score':           _bestResult[4]}
+                                           'score':           _bestResult[4],
+                                           'nTrades':         _bestResult[5]}
                             #Best Result Check
                             if (bestResult is None) or (bestResult['score'] < _bestResult['score']): 
                                 bestResult = _bestResult
@@ -244,7 +247,8 @@ if __name__ == "__main__":
                                      f"      - Final Balance:                  {bestResult['finalBalance']:.8f}\n"
                                      f"      - Growth Rate:                    [{_grStr_color}]{_grStr_sign}{_growthRate_interval:.8f} [default]/ [{_grStr_color}]{_grStr_sign}{_growthRate_daily*100:.3f} % [default][Daily] / [{_grStr_color}]{_grStr_sign}{_growthRate_monthly*100:.3f} % [default][Monthly]\n"
                                      f"      - Volatility:                     {_volatility:.8f} [Theoretical 99.7%: [bright_magenta]{_volatility_tMin_997*100:.3f} % [default]/ [bright_cyan]{_volatility_tMax_997*100:.3f} %]\n[default]"
-                                     f"      - Score:                          {bestResult['score']:.8f}"
+                                     f"      - Score:                          {bestResult['score']:.8f}\n"
+                                     f"      - nTrades:                        {bestResult['nTrades']}"
                                      )
                             rl.update(ppstr)
                 except KeyboardInterrupt:
@@ -371,6 +375,7 @@ if __name__ == "__main__":
             _balance_bestFit_history,
             _balance_bestFit_growthRates,
             _balance_bestFit_volatilities,
+            _nTrades,
             ) = _eFunction.performOnParams(params = _params)
             _t_1 = time.perf_counter_ns()
             print(f"    - Seeker Records Reconstruction Complete! <{(_t_1-_t_0)/1e6:.3f} ms>")

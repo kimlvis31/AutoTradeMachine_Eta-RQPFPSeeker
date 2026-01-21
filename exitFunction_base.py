@@ -438,7 +438,7 @@ class exitFunction():
         #[1]: Tensor Conversion
         _data = torch.from_numpy(data[:,1:]).to(device='cuda', dtype=_TORCHDTYPE)
         #---[2-1]: Normalization Base Values
-        _closePrice_initial = _data[0,3]
+        _closePrice_initial = _data[0,3].item()
         _nonzero_indices = (_data[:,4] != 0).nonzero()
         if 0 < _nonzero_indices.size(0):
             _first_nonzero_idx       = _nonzero_indices[0,0]
@@ -451,6 +451,7 @@ class exitFunction():
         _data[:,0:4] = _data[:,0:4]/_closePrice_initial
         _data[:,4:6] = _data[:,4:6]/_baseAssetVolume_initial
         _data[:,7]   = _data[:,7]  /_closePrice_initial
+
         #---[2-3]: First Full PIP Index
         _data_pip_hasNan_lastSwing = torch.isnan(_data[:,6:8]).any(dim  =1)
         _data_pip_hasNan_NNASignal = torch.isnan(_data[:,8:9]).any(dim  =1)

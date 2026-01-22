@@ -181,7 +181,7 @@ def processBatch_triton_kernel(#Constants
 
 
         #[2]: RQP Values  <!!! EDIT HERE FOR MODEL ADDITION !!!> --------------------------------------------------------------------------------------------------------------------------------------
-        if (MODELNAME == 'CSDEFAULT'):
+        if   (MODELNAME == 'CSDEFAULT'):
             (
                 rqp_val,
                 rqp_st_pip_csf_prev,
@@ -483,19 +483,26 @@ class exitFunction():
 
     def initializeSeeker(self, 
                          paramConfig: list, 
-                         nSeekerPoints:          int, 
-                         nRepetition:            int,
-                         learningRate:           float, 
-                         deltaRatio:             float,
-                         beta_velocity:          float,
-                         beta_momentum:          float,
-                         repopulationRatio:      float, 
-                         repopulationInterval:   int,
-                         repopulationGuideRatio: float,
-                         repopulationDecayRate:  float,
-                         scoring:                tuple[str, float],
-                         scoringSamples:         int,
-                         terminationThreshold:   float) -> None:
+                         nSeekerPoints:            int, 
+                         nRepetition:              int,
+                         learningRate:             float, 
+                         deltaRatio:               float,
+                         beta_velocity:            float,
+                         beta_momentum:            float,
+                         repopulationRatio:        float, 
+                         repopulationInterval:     int,
+                         repopulationGuideRatio:   float,
+                         repopulationDecayRate:    float,
+                         scoring:                  str,
+                         scoring_maxMDD:           int | float,
+                         scoring_growthRateWeight: int | float,
+                         scoring_growthRateScaler: int | float,
+                         scoring_volatilityWeight: int | float,
+                         scoring_volatilityScaler: int | float,
+                         scoring_nTradesWeight:    int | float,
+                         scoring_nTradesScaler:    int | float,
+                         scoringSamples:           int,
+                         terminationThreshold:     float) -> None:
         """
         self.model = [{'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Immed <NECESSARY>
                       {'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Close <NECESSARY>
@@ -547,25 +554,28 @@ class exitFunction():
         if type(repopulationDecayRate) not in (float, int): repopulationDecayRate = 0.1
         if not (0.0 <  repopulationDecayRate <= 1.0):       repopulationDecayRate = 0.1
         #---[2-9]:  scoring
-        if type(scoring) is not tuple or not len(scoring) == 2: scoring = ('SHARPERATIO', (1e-4, 1.0))
-        _scoring_type, _scoring_params = scoring
-        if _scoring_type not in ('FINALBALANCE', 'GROWTHRATE', 'VOLATILITY', 'SHARPERATIO'): scoring = ('SHARPERATIO', (1e-4, 1.0))
-        if   _scoring_type == 'FINALBALANCE': scoring = ('FINALBALANCE', None)
-        elif _scoring_type == 'GROWTHRATE':   scoring = ('GROWTHRATE',   None)
-        elif _scoring_type == 'VOLATILITY':   scoring = ('VOLATILITY',   None)
-        elif _scoring_type == 'SHARPERATIO':
-            if type(_scoring_params) is not tuple or not len(_scoring_params) == 2: _scoring_params = (1.0, None)
-            _sp_volatility_weight = _scoring_params[0]
-            _sp_maxMDD            = _scoring_params[1]
-            #Volatility Weight
-            if type(_sp_volatility_weight) not in (float, int): _sp_volatility_weight = 1.0
-            if not (0.0 <= _sp_volatility_weight):              _sp_volatility_weight = 1.0
-            #Volatility Filter
-            if _sp_maxMDD is not None:
-                if type(_sp_maxMDD) not in (float, int): _sp_maxMDD = None
-                if not (0.0 < _sp_maxMDD <= 1.00):       _sp_maxMDD = None
-            scoring = ('SHARPERATIO', (_sp_volatility_weight, _sp_maxMDD))
-
+        if scoring not in ('FINALBALANCE', 'GROWTHRATE', 'VOLATILITY', 'SHARPERATIO'): scoring = 'FINALBALANCE'
+        #---[2-9]:  scoring_maxMDD
+        if type(scoring_maxMDD) not in (float, int): scoring_maxMDD = 1.0
+        if not (0.0 <= scoring_maxMDD <= 1.0):       scoring_maxMDD = 1.0
+        #---[2-9]:  scoring_growthRateWeight
+        if type(scoring_growthRateWeight) not in (float, int): scoring_growthRateWeight = 1.0
+        if not (0.0 <= scoring_growthRateWeight):              scoring_growthRateWeight = 1.0
+        #---[2-9]:  scoring_growthRateScaler
+        if type(scoring_growthRateScaler) not in (float, int): scoring_growthRateScaler = 1e5
+        if not (0.0 <= scoring_growthRateScaler):              scoring_growthRateScaler = 1e5
+        #---[2-9]:  scoring_volatilityWeight
+        if type(scoring_volatilityWeight) not in (float, int): scoring_volatilityWeight = 1.0
+        if not (0.0 <= scoring_volatilityWeight):              scoring_volatilityWeight = 1.0
+        #---[2-9]:  scoring_volatilityScaler
+        if type(scoring_volatilityScaler) not in (float, int): scoring_volatilityScaler = 0.1
+        if not (0.0 <= scoring_volatilityScaler):              scoring_volatilityScaler = 0.1
+        #---[2-9]:  scoring_nTradesWeight
+        if type(scoring_nTradesWeight) not in (float, int): scoring_nTradesWeight = 1.0
+        if not (0.0 <= scoring_nTradesWeight):              scoring_nTradesWeight = 1.0
+        #---[2-9]:  scoring_nTradesScaler
+        if type(scoring_nTradesScaler) not in (float, int): scoring_nTradesScaler = 0.0001
+        if not (0.0 <= scoring_nTradesScaler):              scoring_nTradesScaler = 0.0001
         #---[2-10]: scoringSamples
         if type(scoringSamples) is not int: scoringSamples = 20
         if not (1 <= scoringSamples):       scoringSamples = 20
@@ -602,20 +612,27 @@ class exitFunction():
 
         #[7]: Seeker Update
         self.__seeker = {#Seeker Parameters
-                         'paramConfig':            paramConfig.copy(),
-                         'nSeekerPoints':          nSeekerPoints,
-                         'nRepetition':            nRepetition,
-                         'learningRate':           learningRate,
-                         'deltaRatio':             deltaRatio,
-                         'beta_velocity':          beta_velocity,
-                         'beta_momentum':          beta_momentum,
-                         'repopulationRatio':      repopulationRatio,
-                         'repopulationInterval':   repopulationInterval,
-                         'repopulationGuideRatio': repopulationGuideRatio,
-                         'repopulationDecayRate':  repopulationDecayRate,
-                         'scoring':                scoring,
-                         'scoringSamples':         scoringSamples,
-                         'terminationThreshold':   terminationThreshold,
+                         'paramConfig':              paramConfig.copy(),
+                         'nSeekerPoints':            nSeekerPoints,
+                         'nRepetition':              nRepetition,
+                         'learningRate':             learningRate,
+                         'deltaRatio':               deltaRatio,
+                         'beta_velocity':            beta_velocity,
+                         'beta_momentum':            beta_momentum,
+                         'repopulationRatio':        repopulationRatio,
+                         'repopulationInterval':     repopulationInterval,
+                         'repopulationGuideRatio':   repopulationGuideRatio,
+                         'repopulationDecayRate':    repopulationDecayRate,
+                         'scoring':                  scoring,
+                         'scoring_maxMDD':           scoring_maxMDD,
+                         'scoring_growthRateWeight': scoring_growthRateWeight,
+                         'scoring_growthRateScaler': scoring_growthRateScaler,
+                         'scoring_volatilityWeight': scoring_volatilityWeight,
+                         'scoring_volatilityScaler': scoring_volatilityScaler,
+                         'scoring_nTradesWeight':    scoring_nTradesWeight,
+                         'scoring_nTradesScaler':    scoring_nTradesScaler,
+                         'scoringSamples':           scoringSamples,
+                         'terminationThreshold':     terminationThreshold,
                          #Process Variables
                          '_params_rounding_factors': params_rounding_factors,
                          '_params_fixed_mask':       params_fixed_mask,
@@ -632,20 +649,27 @@ class exitFunction():
         
         #[8]: Applied Seeker Configuration
         seeker_applied = dict()
-        seeker_applied['paramConfig']            = paramConfig.copy()
-        seeker_applied['nSeekerPoints']          = self.__seeker['nSeekerPoints']
-        seeker_applied['nRepetition']            = self.__seeker['nRepetition']
-        seeker_applied['learningRate']           = self.__seeker['learningRate']
-        seeker_applied['deltaRatio']             = self.__seeker['deltaRatio']
-        seeker_applied['beta_velocity']          = self.__seeker['beta_velocity']
-        seeker_applied['beta_momentum']          = self.__seeker['beta_momentum']
-        seeker_applied['repopulationRatio']      = self.__seeker['repopulationRatio']
-        seeker_applied['repopulationInterval']   = self.__seeker['repopulationInterval']
-        seeker_applied['repopulationGuideRatio'] = self.__seeker['repopulationGuideRatio']
-        seeker_applied['repopulationDecayRate']  = self.__seeker['repopulationDecayRate']
-        seeker_applied['scoring']                = self.__seeker['scoring']
-        seeker_applied['scoringSamples']         = self.__seeker['scoringSamples']
-        seeker_applied['terminationThreshold']   = self.__seeker['terminationThreshold']
+        seeker_applied['paramConfig']              = paramConfig.copy()
+        seeker_applied['nSeekerPoints']            = self.__seeker['nSeekerPoints']
+        seeker_applied['nRepetition']              = self.__seeker['nRepetition']
+        seeker_applied['learningRate']             = self.__seeker['learningRate']
+        seeker_applied['deltaRatio']               = self.__seeker['deltaRatio']
+        seeker_applied['beta_velocity']            = self.__seeker['beta_velocity']
+        seeker_applied['beta_momentum']            = self.__seeker['beta_momentum']
+        seeker_applied['repopulationRatio']        = self.__seeker['repopulationRatio']
+        seeker_applied['repopulationInterval']     = self.__seeker['repopulationInterval']
+        seeker_applied['repopulationGuideRatio']   = self.__seeker['repopulationGuideRatio']
+        seeker_applied['repopulationDecayRate']    = self.__seeker['repopulationDecayRate']
+        seeker_applied['scoring']                  = self.__seeker['scoring']
+        seeker_applied['scoring_maxMDD']           = self.__seeker['scoring_maxMDD']
+        seeker_applied['scoring_growthRateWeight'] = self.__seeker['scoring_growthRateWeight']
+        seeker_applied['scoring_growthRateScaler'] = self.__seeker['scoring_growthRateScaler']
+        seeker_applied['scoring_volatilityWeight'] = self.__seeker['scoring_volatilityWeight']
+        seeker_applied['scoring_volatilityScaler'] = self.__seeker['scoring_volatilityScaler']
+        seeker_applied['scoring_nTradesWeight']    = self.__seeker['scoring_nTradesWeight']
+        seeker_applied['scoring_nTradesScaler']    = self.__seeker['scoring_nTradesScaler']
+        seeker_applied['scoringSamples']           = self.__seeker['scoringSamples']
+        seeker_applied['terminationThreshold']     = self.__seeker['terminationThreshold']
 
         return seeker_applied
     
@@ -691,30 +715,44 @@ class exitFunction():
         return params_test, params_plus, params_minus
     
     def __scoreResults(self, balance_finals, balance_bestFit_growthRates, balance_bestFit_volatilities, nTrades):
-        scoringType, scoringParam = self.__seeker['scoring']
+        scoring                  = self.__seeker['scoring']
+        scoring_maxMDD           = self.__seeker['scoring_maxMDD']
+        scoring_growthRateWeight = self.__seeker['scoring_growthRateWeight']
+        scoring_growthRateScaler = self.__seeker['scoring_growthRateScaler']
+        scoring_volatilityWeight = self.__seeker['scoring_volatilityWeight']
+        scoring_volatilityScaler = self.__seeker['scoring_volatilityScaler']
+        scoring_nTradesWeight    = self.__seeker['scoring_nTradesWeight']
+        scoring_nTradesScaler    = self.__seeker['scoring_nTradesScaler']
+
         #[1]: TYPE - 'FINALBALANCE'
-        if (scoringType == 'FINALBALANCE'):
-            scores = torch.atan(balance_finals)/torch.pi*2
+        if (scoring == 'FINALBALANCE'):
+            scores = 1-torch.exp(-balance_finals)
 
         #[2]: TYPE - 'GROWTHRATE'
-        elif (scoringType == 'GROWTHRATE'):
-            scores = torch.atan(balance_bestFit_growthRates)/torch.pi+0.5
+        elif (scoring == 'GROWTHRATE'):
+            scores = torch.where(balance_bestFit_growthRates < 0,
+                                 1/(1-balance_bestFit_growthRates*scoring_growthRateScaler),
+                                 1+balance_bestFit_growthRates*scoring_growthRateScaler)
 
         #[3]: TYPE - 'VOLATILITY'
-        elif (scoringType == 'VOLATILITY'):
-            scores = torch.atan(nTrades/balance_bestFit_volatilities.clamp_min(min = 1e-12))/torch.pi+0.5
+        elif (scoring == 'VOLATILITY'):
+            scores_volatility = torch.exp(-balance_bestFit_volatilities*scoring_volatilityScaler) ** scoring_volatilityWeight
+            scores_nTrades    = (1-torch.exp(-nTrades*scoring_nTradesScaler))                     ** scoring_nTradesWeight
+            scores = scores_volatility * scores_nTrades
 
         #[4]: TYPE - 'SHARPERATIO'
-        elif (scoringType == 'SHARPERATIO'):
-            volatility_weight = scoringParam[0] #Volatility Influence Weight
-            maxMDD            = scoringParam[1] #Maximum Draw Down
+        elif (scoring == 'SHARPERATIO'):
+            scores_gr = torch.where(balance_bestFit_growthRates < 0,
+                                    1/(1-balance_bestFit_growthRates*scoring_growthRateScaler),
+                                    1+balance_bestFit_growthRates*scoring_growthRateScaler) ** scoring_growthRateWeight
+            scores_volatility = torch.exp(-balance_bestFit_volatilities*scoring_volatilityScaler) ** scoring_volatilityWeight
+            scores_nTrades    = (1-torch.exp(-nTrades*scoring_nTradesScaler))                     ** scoring_nTradesWeight
 
-            scores_gr  = torch.atan(balance_bestFit_growthRates)/torch.pi+0.5
-            scores_vol = torch.atan(torch.sqrt(nTrades/balance_bestFit_volatilities.clamp_min(min = 1e-4)))/torch.pi+0.5
-            scores = scores_gr*(scores_vol**volatility_weight)
-            if maxMDD is not None:
-                volatility_tMin_997 = torch.exp(-balance_bestFit_volatilities*3)-1
-                scores = torch.where(maxMDD < -volatility_tMin_997, 0.0, scores)
+            scores = scores_gr * scores_volatility * scores_nTrades
+            
+        #[5]: Maximum Drawdown Filtering
+        volatility_tMin_997 = torch.exp(-balance_bestFit_volatilities*3)-1
+        scores = torch.where(scoring_maxMDD < -volatility_tMin_997, 0.0, scores)
 
         #[6]: Finally
         return scores

@@ -730,24 +730,30 @@ class exitFunction():
 
         #[2]: TYPE - 'GROWTHRATE'
         elif (scoring == 'GROWTHRATE'):
+            gr_scaled = balance_bestFit_growthRates * scoring_growthRateScaler
             scores = torch.where(balance_bestFit_growthRates < 0,
-                                 1/(1-balance_bestFit_growthRates*scoring_growthRateScaler),
-                                 1+balance_bestFit_growthRates*scoring_growthRateScaler)
+                                 1/(1-gr_scaled),
+                                 1+gr_scaled)
 
         #[3]: TYPE - 'VOLATILITY'
         elif (scoring == 'VOLATILITY'):
-            scores_volatility = torch.exp(-balance_bestFit_volatilities*scoring_volatilityScaler) ** scoring_volatilityWeight
-            scores_nTrades    = (1-torch.exp(-nTrades*scoring_nTradesScaler))                     ** scoring_nTradesWeight
+            vol_scaled     = balance_bestFit_volatilities * scoring_volatilityScaler
+            nTrades_scaled = nTrades                      * scoring_nTradesScaler
+            scores_volatility = torch.exp(-vol_scaled)         ** scoring_volatilityWeight
+            scores_nTrades    = (1-torch.exp(-nTrades_scaled)) ** scoring_nTradesWeight
             scores = scores_volatility * scores_nTrades
 
         #[4]: TYPE - 'SHARPERATIO'
         elif (scoring == 'SHARPERATIO'):
+            gr_scaled      = balance_bestFit_growthRates  * scoring_growthRateScaler
+            vol_scaled     = balance_bestFit_volatilities * scoring_volatilityScaler
+            nTrades_scaled = nTrades                      * scoring_nTradesScaler
             scores_gr = torch.where(balance_bestFit_growthRates < 0,
-                                    1/(1-balance_bestFit_growthRates*scoring_growthRateScaler),
-                                    1+balance_bestFit_growthRates*scoring_growthRateScaler) ** scoring_growthRateWeight
-            scores_volatility = torch.exp(-balance_bestFit_volatilities*scoring_volatilityScaler) ** scoring_volatilityWeight
-            scores_nTrades    = (1-torch.exp(-nTrades*scoring_nTradesScaler))                     ** scoring_nTradesWeight
-
+                                    1/(1-gr_scaled),
+                                    1+gr_scaled
+                                    ) ** scoring_growthRateWeight
+            scores_volatility = torch.exp(-vol_scaled)         ** scoring_volatilityWeight
+            scores_nTrades    = (1-torch.exp(-nTrades_scaled)) ** scoring_nTradesWeight
             scores = scores_gr * scores_volatility * scores_nTrades
             
         #[5]: Maximum Drawdown Filtering

@@ -74,12 +74,12 @@ class exitFunction():
 
     def preprocessData(self, linearizedAnalysis: numpy.ndarray, indexIdentifier: dict) -> None:
         #[1]: Tensor Conversion
-        linearizedAnalysis = torch.from_numpy(linearizedAnalysis).to(device='cuda', dtype=_TORCHDTYPE)
+        linearizedAnalysis = torch.from_numpy(linearizedAnalysis).to(device='cuda', dtype=torch.float64)
         dataLen = linearizedAnalysis.size(dim = 0)
 
         #[2]: Klines Tensor
         #---[2-1]: Klines Data Initialization & Data Load
-        data_klines = torch.full(size = (dataLen, 7), fill_value = torch.nan, device='cuda', dtype=_TORCHDTYPE)
+        data_klines = torch.full(size = (dataLen, 7), fill_value = torch.nan, device='cuda', dtype=torch.float64)
         for lIndex, klKey in ((KLINEINDEX_OPENTIME,        'KLINE_OPENTIME'), 
                               (KLINEINDEX_OPENPRICE,       'KLINE_OPENPRICE'), 
                               (KLINEINDEX_HIGHPRICE,       'KLINE_HIGHPRICE'), 
@@ -109,11 +109,11 @@ class exitFunction():
         data_klines[:,KLINEINDEX_VOLBASE]         = data_klines[:,KLINEINDEX_VOLBASE]        /baseAssetVolume_initial
         data_klines[:,KLINEINDEX_VOLBASETAKERBUY] = data_klines[:,KLINEINDEX_VOLBASETAKERBUY]/baseAssetVolume_initial
         #---[2-3]: Update Klines Data
-        self.__data_klines = data_klines.contiguous()
+        self.__data_klines = data_klines.to(dtype=_TORCHDTYPE).contiguous()
 
         #[3]: Analysis Tensor
         #---[2-1]: Analysis Data Load
-        data_analysis = torch.full(size = (dataLen, len(self.inputDataKeys)), fill_value = torch.nan, device='cuda', dtype=_TORCHDTYPE)
+        data_analysis = torch.full(size = (dataLen, len(self.inputDataKeys)), fill_value = torch.nan, device='cuda', dtype=torch.float64)
         for lIndex, laKey in enumerate(self.inputDataKeys):
             #[2-1-1]: Linearized Analysis Key Check
             if laKey not in indexIdentifier:
@@ -126,7 +126,7 @@ class exitFunction():
                                                                     closePrice_initial      = closePrice_initial,
                                                                     baseAssetVolume_initial = baseAssetVolume_initial)
         #---[2-2]: Save Contiguous Analysis Data
-        self.__data_analysis = data_analysis.contiguous()
+        self.__data_analysis = data_analysis.to(dtype=_TORCHDTYPE).contiguous()
 
     def __preprocessAnalysisData(self, linearizedAnalysisKey, analysisDataLine, closePrice_initial, baseAssetVolume_initial):
         #[1]: Linearized Analysis Key Check

@@ -137,8 +137,6 @@ def processBatch_triton_kernel(#Constants
             #Previous RQP Value Reference
             rqp_prev = rqp_prev
             )
-        
-        rqp_val = tl.floor(rqp_val*1e4+0.5)*1e-4
         # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
         #[2]: Trade Simulation

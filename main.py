@@ -6,7 +6,6 @@ import os
 import matplotlib
 import matplotlib.pyplot
 import termcolor
-import sys
 import math
 import config
 from rich.console import Console as rConsole

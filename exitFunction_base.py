@@ -5,11 +5,9 @@ import sys
 import math
 import time
 from functools import wraps
-import triton
-import triton.language as tl
 
-from exitFunction_models import RQPFUNCTIONS_MODEL
-import rqpfunctions
+from exitFunction_models import RQPFUNCTIONS_MODEL, RQPFUNCTIONS_INPUTDATAKEY, RQPFUNCTIONS_BATCHPROCESSFUNCTION
+import rqpfunctions.simulatorFunctions as sf
 
 ALLOCATIONRATIO = 0.90
 TRADINGFEE      = 0.0005
@@ -18,6 +16,14 @@ BPST_KVALUE        = 2/(100+1)
 BPST_PRINTINTERVAL = 100e6
 
 _TORCHDTYPE = torch.float32
+
+KLINEINDEX_OPENTIME        = sf.KLINEINDEX_OPENTIME
+KLINEINDEX_OPENPRICE       = sf.KLINEINDEX_OPENPRICE
+KLINEINDEX_HIGHPRICE       = sf.KLINEINDEX_HIGHPRICE
+KLINEINDEX_LOWPRICE        = sf.KLINEINDEX_LOWPRICE
+KLINEINDEX_CLOSEPRICE      = sf.KLINEINDEX_CLOSEPRICE
+KLINEINDEX_VOLBASE         = sf.KLINEINDEX_VOLBASE
+KLINEINDEX_VOLBASETAKERBUY = sf.KLINEINDEX_VOLBASETAKERBUY
 
 def removeConsoleLines(nLinesToRemove: int) -> None:
     for _ in range (nLinesToRemove): 
@@ -47,439 +53,246 @@ def BPST_Timer(func):
         return result, t_elapsed_ms
     return wrapper
 
-#Batch Processing Triton Kernel Function ================================================================================================================================================================================================================
-@triton.jit
-def processBatch_triton_kernel(#Constants
-                                leverage:        tl.constexpr,
-                                allocationRatio: tl.constexpr,
-                                tradingFee:      tl.constexpr,
-                                #Base Data
-                                data_price_open,
-                                data_price_high,
-                                data_price_low,
-                                data_price_close,
-                                data_volume,
-                                data_volume_tb,
-                                data_pip_lst,
-                                data_pip_lsp,
-                                data_pip_nna,
-                                data_pip_csf,
-                                data_pip_ivp,
-                                data_pip_ivp_stride: tl.constexpr,
-                                params_trade_fslImmed,
-                                params_trade_fslClose,
-                                params_trade_pslReentry: tl.constexpr,
-                                params_model,
-                                params_model_stride: tl.constexpr,
-                                #Result Buffers
-                                balance_finals,
-                                balance_bestFit_intercepts,
-                                balance_bestFit_growthRates,
-                                balance_bestFit_volatilities,
-                                balance_wallet_history,
-                                balance_margin_history,
-                                balance_ftIndexes,
-                                nTrades_rb,
-                                #Sizes
-                                size_paramsBatch: tl.constexpr,
-                                size_dataLen:     tl.constexpr,
-                                size_loop:        tl.constexpr,
-                                #Model & Mode
-                                MODELNAME:  tl.constexpr,
-                                SEEKERMODE: tl.constexpr
-                                ):
-    #Process ID Check
-    pid = tl.program_id(0)
-    if size_paramsBatch <= pid: return
-
-    #Model Parameters and State Trackers <!!! EDIT HERE FOR MODEL ADDITION !!!>
-    mp_base_ptr = params_model + (pid * params_model_stride)
-    if (MODELNAME == 'CSDEFAULT'):
-        #Parameters
-        mp_delta      = tl.load(mp_base_ptr + 0)
-        mp_strength_S = tl.load(mp_base_ptr + 1)
-        mp_strength_L = tl.load(mp_base_ptr + 2)
-        #State Trackers
-        rqp_st_pip_csf_prev = -1.0
-    elif (MODELNAME == 'SPDDEFAULT'):
-        #Parameters
-        mp_delta_S    = tl.load(mp_base_ptr + 0)
-        mp_strength_S = tl.load(mp_base_ptr + 1)
-        mp_length_S   = tl.load(mp_base_ptr + 2)
-        mp_delta_L    = tl.load(mp_base_ptr + 3)
-        mp_strength_L = tl.load(mp_base_ptr + 4)
-        mp_length_L   = tl.load(mp_base_ptr + 5)
-        #State Trackers
-        rqp_st_pip_lst_prev = -1.0
-        rqp_st_pip_lsp_prev = -1.0
-    elif (MODELNAME == 'CSPDRG1'):
-        #Parameters
-        mp_delta   = tl.load(mp_base_ptr + 0)
-        mp_theta_S = tl.load(mp_base_ptr + 1)
-        mp_alpha_S = tl.load(mp_base_ptr + 2)
-        mp_beta0_S = tl.load(mp_base_ptr + 3)
-        mp_beta1_S = tl.load(mp_base_ptr + 4)
-        mp_gamma_S = tl.load(mp_base_ptr + 5)
-        mp_theta_L = tl.load(mp_base_ptr + 6)
-        mp_alpha_L = tl.load(mp_base_ptr + 7)
-        mp_beta0_L = tl.load(mp_base_ptr + 8)
-        mp_beta1_L = tl.load(mp_base_ptr + 9)
-        mp_gamma_L = tl.load(mp_base_ptr + 10)
-        #State Trackers
-        rqp_st_pip_csf_prev      = -1.0
-        rqp_st_cycleContinuation = -1.0
-        rqp_st_cycleBeginPrice   = 0.0
-
-    # RQP Values
-    rqp_val  = 0.0
-    rqp_prev = 0.0
-    #Trade Parameters Load
-    tp_fsl_immed = tl.load(params_trade_fslImmed + pid)
-    tp_fsl_close = tl.load(params_trade_fslClose + pid)
-    #Trade Simulation State
-    balance_wallet    = 1.0
-    balance_allocated = balance_wallet * allocationRatio
-    balance_margin    = 1.0
-    balance_ftIndex   = -1
-    quantity          = 0.0
-    entryPrice        = 0.0
-    forceExited       = 0.0
-    nTrades           = 0
-    #Balance Trend
-    bt_sum         = 0.0
-    bt_sum_squared = 0.0
-    bt_sum_xy      = 0.0
-
-    #Loop
-    for i in range(0, size_loop):
-        #[1]: Base Data Load --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        d_price_open  = tl.load(data_price_open  + i) 
-        d_price_high  = tl.load(data_price_high  + i) 
-        d_price_low   = tl.load(data_price_low   + i) 
-        d_price_close = tl.load(data_price_close + i) 
-        d_volume      = tl.load(data_volume      + i)
-        d_volume_tb   = tl.load(data_volume_tb   + i)
-        d_pip_lst     = tl.load(data_pip_lst     + i) 
-        d_pip_lsp     = tl.load(data_pip_lsp     + i)
-        d_pip_nna     = tl.load(data_pip_nna     + i)
-        d_pip_csf     = tl.load(data_pip_csf     + i)
-        d_pip_ivp_base_ptr = data_pip_ivp + (i * data_pip_ivp_stride)
-        d_pip_ivp_0 = tl.load(d_pip_ivp_base_ptr + 0)
-        d_pip_ivp_1 = tl.load(d_pip_ivp_base_ptr + 1)
-        d_pip_ivp_2 = tl.load(d_pip_ivp_base_ptr + 2)
-        d_pip_ivp_3 = tl.load(d_pip_ivp_base_ptr + 3)
-        d_pip_ivp_4 = tl.load(d_pip_ivp_base_ptr + 4)
-        d_pip_ivp_5 = tl.load(d_pip_ivp_base_ptr + 5)
-        d_pip_ivp_6 = tl.load(d_pip_ivp_base_ptr + 6)
-        d_pip_ivp_7 = tl.load(d_pip_ivp_base_ptr + 7)
-        d_pip_ivp_8 = tl.load(d_pip_ivp_base_ptr + 8)
-        d_pip_ivp_9 = tl.load(d_pip_ivp_base_ptr + 9)
-        # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-        #[2]: RQP Values  <!!! EDIT HERE FOR MODEL ADDITION !!!> --------------------------------------------------------------------------------------------------------------------------------------
-        if   (MODELNAME == 'CSDEFAULT'):
-            (
-                rqp_val,
-                rqp_st_pip_csf_prev,
-            ) = rqpfunctions.rqpf_CSDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
-                                                        mp_delta      = mp_delta,
-                                                        mp_strength_S = mp_strength_S,
-                                                        mp_strength_L = mp_strength_L,
-                                                        #Model State Trackers <UNIQUE>
-                                                        st_pip_csf_prev = rqp_st_pip_csf_prev,
-                                                        #Base Data <COMMON>
-                                                        data_pip_csf = d_pip_csf,
-                                                        rqpVal_prev  = rqp_prev)
-        elif (MODELNAME == 'SPDDEFAULT'):
-            (
-                rqp_val,
-                rqp_st_pip_lst_prev,
-                rqp_st_pip_lsp_prev
-            ) = rqpfunctions.rqpf_SPDDEFAULT.getRQPValue(#Model Parameters <UNIQUE>
-                                                         mp_delta_S    = mp_delta_S,
-                                                         mp_strength_S = mp_strength_S,
-                                                         mp_length_S   = mp_length_S,
-                                                         mp_delta_L    = mp_delta_L,
-                                                         mp_strength_L = mp_strength_L,
-                                                         mp_length_L   = mp_length_L,
-                                                         #Model State Trackers <UNIQUE>
-                                                         st_pip_lst_prev = rqp_st_pip_lst_prev,
-                                                         st_pip_lsp_prev = rqp_st_pip_lsp_prev,
-                                                         #Base Data <COMMON>
-                                                         data_price_close = d_price_close,
-                                                         data_pip_lst = d_pip_lst,
-                                                         data_pip_lsp = d_pip_lsp,
-                                                         rqpVal_prev  = rqp_prev)
-        elif (MODELNAME == 'CSPDRG1'):
-            (
-                rqp_val,
-                rqp_st_pip_csf_prev,
-                rqp_st_cycleContinuation,
-                rqp_st_cycleBeginPrice
-            ) = rqpfunctions.rqpf_CSPDRG1.getRQPValue(#Model Parameters <UNIQUE>
-                                                      mp_delta   = mp_delta,
-                                                      mp_theta_S = mp_theta_S,
-                                                      mp_alpha_S = mp_alpha_S,
-                                                      mp_beta0_S = mp_beta0_S,
-                                                      mp_beta1_S = mp_beta1_S,
-                                                      mp_gamma_S = mp_gamma_S,
-                                                      mp_theta_L = mp_theta_L,
-                                                      mp_alpha_L = mp_alpha_L,
-                                                      mp_beta0_L = mp_beta0_L,
-                                                      mp_beta1_L = mp_beta1_L,
-                                                      mp_gamma_L = mp_gamma_L,
-                                                      #Model State Trackers <UNIQUE>
-                                                      st_pip_csf_prev      = rqp_st_pip_csf_prev,
-                                                      st_cycleContinuation = rqp_st_cycleContinuation,
-                                                      st_cycleBeginPrice   = rqp_st_cycleBeginPrice,
-                                                      #Base Data <COMMON>
-                                                      data_price_close = d_price_close,
-                                                      data_pip_csf     = d_pip_csf,
-                                                      rqpVal_prev      = rqp_prev)
-
-        rqp_val = tl.floor(rqp_val*1e4+0.5)*1e-4
-        # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-        #[3]: Trade Processing ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        # region
-        #Position Side & Has #qty_entry
-        position_side = tl.where(0 < quantity,  1.0, 0.0)
-        position_side = tl.where(quantity < 0, -1.0, position_side)
-        position_has = (quantity != 0)
-
-        #Exit Conditions
-        price_act_FSLImmed = entryPrice * (1.0 - position_side*tp_fsl_immed)
-        price_act_FSLClose = entryPrice * (1.0 - position_side*tp_fsl_close)
-        price_liquidation  = entryPrice * (1.0 - position_side/leverage)
-
-        price_worst = tl.where(0 < quantity, d_price_low,  d_price_close)
-        price_worst = tl.where(quantity < 0, d_price_high, price_worst)
-        
-        hit_liquidation = position_has & ((position_side*price_worst)   <= (position_side*price_liquidation))
-        hit_fslImmed    = position_has & ((position_side*price_worst)   <= (position_side*price_act_FSLImmed))
-        hit_fslClose    = position_has & ((position_side*d_price_close) <= (position_side*price_act_FSLClose))
-
-        #Exit Execution Price
-        price_exit_execution = tl.where(hit_fslImmed,    price_act_FSLImmed, d_price_close)
-        price_exit_execution = tl.where(hit_liquidation, price_liquidation,  price_exit_execution)
-        
-        #Quantity Reduce
-        balance_committed = tl.abs(quantity)  * entryPrice
-        balance_toCommit  = balance_allocated * tl.abs(rqp_val)
-
-        status_forceExit        = hit_liquidation | hit_fslImmed | hit_fslClose
-        status_positionReversal = (rqp_prev * rqp_val) < 0
-        status_partialExit      = (balance_toCommit - balance_committed) < 0
-
-        quantity_new = tl.where(position_has & status_partialExit,          (balance_toCommit / entryPrice) * position_side, quantity)
-        quantity_new = tl.where(status_forceExit | status_positionReversal, 0.0,                                             quantity_new)
-
-        quantity_delta = quantity_new - quantity
-        profit         = quantity_delta * (entryPrice-price_exit_execution)
-        fee            = tl.abs(quantity_delta) * price_exit_execution * tradingFee
-
-        #Wallet Balance Post-Exit Update
-        balance_wallet = balance_wallet + (profit - fee) * leverage
-        balance_wallet = tl.maximum(balance_wallet, 0.0)
-        
-        #Allocated Balance Update
-        balance_allocated = tl.where(quantity_new == 0.0, 
-                                     balance_wallet*allocationRatio, 
-                                     balance_allocated) 
-        
-        #Force Exit State Update
-        if (params_trade_pslReentry == False): 
-            forceExited = tl.where(status_forceExit,        1.0, forceExited)
-            forceExited = tl.where(status_positionReversal, 0.0, forceExited)
-
-        #Quantity Increase
-        balance_committed = tl.abs(quantity_new) * entryPrice
-        balance_toCommit  = balance_allocated * tl.abs(rqp_val)
-        balance_toCommit_entry = tl.maximum(balance_toCommit-balance_committed, 0.0)
-
-        quantity_entry = tl.where(forceExited == 0.0,
-                                  (balance_toCommit_entry / d_price_close)*tl.where(rqp_val < 0, -1.0, 1.0),
-                                  0.0)
-        quantity_final = quantity_new + quantity_entry
-        
-        #Entry Price Update
-        entryPrice_new = tl.where(quantity_final == 0.0, 
-                                  0.0, 
-                                  (tl.abs(quantity_new)*entryPrice + tl.abs(quantity_entry)*d_price_close) / tl.maximum(tl.abs(quantity_final), 1e-6))
-        
-        #Wallet Balance Post-Entry Update
-        fee = tl.abs(quantity_entry) * d_price_close * tradingFee
-        balance_wallet = balance_wallet - fee * leverage
-        balance_wallet = tl.maximum(balance_wallet, 0.0)
-
-        #Margin Balance
-        balance_margin = balance_wallet + quantity_final * (d_price_close - entryPrice_new) * leverage
-        balance_margin = tl.maximum(balance_margin, 0.0)
-
-        #Update State
-        balance_ftIndex = tl.where((balance_ftIndex == -1) & (quantity_final != quantity), i, balance_ftIndex)
-        nTrades         = tl.where(quantity_final != quantity, nTrades+1, nTrades)
-        quantity   = quantity_final
-        entryPrice = entryPrice_new
-
-        # endregion
-        # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-        #[4]: Balance Trend Trackers ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        first_trade_occurred = (0 <= balance_ftIndex)
-        bt_val_x = tl.where(first_trade_occurred, (i-balance_ftIndex).to(tl.float32), 0.0)
-        bt_val_y = tl.where(first_trade_occurred, tl.log(balance_wallet),             0.0)
-        bt_sum         += bt_val_y
-        bt_sum_squared += bt_val_y*bt_val_y
-        bt_sum_xy      += bt_val_x*bt_val_y
-        # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-        #[5]: History Record --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        if not SEEKERMODE:
-            off_write = pid * size_loop + i
-            tl.store(balance_wallet_history  + off_write, balance_wallet)
-            tl.store(balance_margin_history  + off_write, balance_margin)
-        rqp_prev = rqp_val
-        # ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-    #Balance Trend Evaluation
-    bt_n      = (size_loop-balance_ftIndex).to(tl.float32)
-    bt_valid  = (0 <= balance_ftIndex) & (1.0 < bt_n)
-    bt_n_safe = tl.where(bt_valid, bt_n, 1.0)
-
-    bt_sum_x  = bt_n*(bt_n-1.0)*0.5
-    bt_mean_y = bt_sum   / bt_n_safe
-    bt_mean_x = bt_sum_x / bt_n_safe
-
-    denominator_growth      = (bt_n * bt_n * (bt_n * bt_n - 1.0)) / 12.0
-    denominator_growth_safe = tl.where(bt_valid, denominator_growth, 1.0)
-    numerator_growth        = (bt_n * bt_sum_xy) - (bt_sum_x * bt_sum)
-    raw_growthRate          = numerator_growth / denominator_growth_safe
-
-    raw_intercepts = bt_mean_y - (raw_growthRate * bt_mean_x)
-
-    bt_var_x = (bt_n * bt_n - 1.0) / 12.0
-    bt_var_y = (bt_sum_squared / bt_n_safe) - (bt_mean_y * bt_mean_y)
-    
-    raw_variance_resid = tl.maximum(bt_var_y - (raw_growthRate * raw_growthRate * bt_var_x), 0.0)
-    raw_volatility     = tl.sqrt(raw_variance_resid)
-
-    bt_growthRate = tl.where(bt_valid, raw_growthRate, 0.0)
-    bt_intercepts = tl.where(bt_valid, raw_intercepts, 0.0)
-    bt_volatility = tl.where(bt_valid, raw_volatility, 0.0)
-
-    #Final Results Store
-    tl.store(balance_bestFit_intercepts   + pid, bt_intercepts)
-    tl.store(balance_bestFit_growthRates  + pid, bt_growthRate)
-    tl.store(balance_bestFit_volatilities + pid, bt_volatility)
-    tl.store(balance_finals               + pid, balance_wallet)
-    tl.store(balance_ftIndexes            + pid, balance_ftIndex)
-    tl.store(nTrades_rb                   + pid, nTrades)
-# =======================================================================================================================================================================================================================================================
-
-
-
-
-
-
-
-
-
-
 #Exit Function Model ====================================================================================================================================================================================================================================
 class exitFunction():
     def __init__(self, modelName, isSeeker, leverage, pslReentry, parameterBatchSize = 32):
-        self.MODELNAME = modelName
-        self.model     = RQPFUNCTIONS_MODEL[self.MODELNAME]
+        self.MODELNAME                 = modelName
+        self.model                     = RQPFUNCTIONS_MODEL[self.MODELNAME]
+        self.inputDataKeys             = RQPFUNCTIONS_INPUTDATAKEY[self.MODELNAME]
+        self.modelBatchProcessFunction = RQPFUNCTIONS_BATCHPROCESSFUNCTION[self.MODELNAME]
         self.isSeeker           = isSeeker
         self.leverage           = leverage
         self.pslReentry         = pslReentry
         self.parameterBatchSize = parameterBatchSize
 
         #Data Set
-        self.__data_price_open  = None
-        self.__data_price_high  = None
-        self.__data_price_low   = None
-        self.__data_price_close = None
-        self.__data_volume      = None
-        self.__data_volume_tb   = None
-        self.__data_pip_lst     = None
-        self.__data_pip_lsp     = None
-        self.__data_pip_nna     = None
-        self.__data_pip_csf     = None
-        self.__data_pip_ivp     = None
-        self.__data_nValidSamples = None
+        self.__data_klines   = None
+        self.__data_analysis = None
 
         #Seeker
         self.__seeker = None
 
-    def preprocessData(self, data: numpy.ndarray) -> None:
-        # data[:,0]  - Timestamp
-        # data[:,1]  - Open Price
-        # data[:,2]  - High Price
-        # data[:,3]  - Low  Price
-        # data[:,4]  - Close Price
-        # data[:,5]  - Base Asset Volume
-        # data[:,6]  - Base Asset Volume - Taker Buy
-        # data[:,7]     - PIP Last Swing Type
-        # data[:,8]     - PIP Last Swing Price
-        # data[:,9]     - NNA Signal
-        # data[:,10]    - PIP Classical Signal Filtered
-        # data[:,11:21] - IVP Boundaries
-
+    def preprocessData(self, linearizedAnalysis: numpy.ndarray, indexIdentifier: dict) -> None:
         #[1]: Tensor Conversion
-        _data = torch.from_numpy(data[:,1:]).to(device='cuda', dtype=_TORCHDTYPE)
-        #---[2-1]: Normalization Base Values
-        _closePrice_initial = _data[0,3].item()
-        _nonzero_indices = (_data[:,4] != 0).nonzero()
-        if 0 < _nonzero_indices.size(0):
-            _first_nonzero_idx       = _nonzero_indices[0,0]
-            _baseAssetVolume_initial = _data[_first_nonzero_idx,4]
-            if (_first_nonzero_idx != 0): print(termcolor.colored(f"      - [WARNING] None zero-index volume used during the volume normalization. Used Index: {_first_nonzero_idx}", 'light_red'))
+        linearizedAnalysis = torch.from_numpy(linearizedAnalysis).to(device='cuda', dtype=_TORCHDTYPE)
+        dataLen = linearizedAnalysis.size(dim = 0)
+
+        #[2]: Klines Tensor
+        #---[2-1]: Klines Data Initialization & Data Load
+        data_klines = torch.full(size = (dataLen, 7), fill_value = torch.nan, device='cuda', dtype=_TORCHDTYPE)
+        for lIndex, klKey in ((KLINEINDEX_OPENTIME,        'KLINE_OPENTIME'), 
+                              (KLINEINDEX_OPENPRICE,       'KLINE_OPENPRICE'), 
+                              (KLINEINDEX_HIGHPRICE,       'KLINE_HIGHPRICE'), 
+                              (KLINEINDEX_LOWPRICE,        'KLINE_LOWPRICE'), 
+                              (KLINEINDEX_CLOSEPRICE,      'KLINE_CLOSEPRICE'), 
+                              (KLINEINDEX_VOLBASE,         'KLINE_VOLBASE'), 
+                              (KLINEINDEX_VOLBASETAKERBUY, 'KLINE_VOLBASETAKERBUY')):
+            if klKey not in indexIdentifier:
+                print(termcolor.colored(f"      - [WARNING] Kline Data Key '{klKey}' Not Found In The Index Identifier. The Corresponding Data Will Stay Empty", 'light_red'))
+                continue
+            aIndex = indexIdentifier[klKey]
+            data_klines[:,lIndex] = linearizedAnalysis[:,aIndex]
+        #---[2-2]: Klines Data Normalization
+        closePrice_initial = data_klines[0,KLINEINDEX_CLOSEPRICE].item()
+        nonzero_indices = (data_klines[:,KLINEINDEX_VOLBASE] != 0).nonzero()
+        if 0 < nonzero_indices.size(0):
+            first_nonzero_idx       = nonzero_indices[0, 0]
+            baseAssetVolume_initial = data_klines[first_nonzero_idx, KLINEINDEX_VOLBASE]
+            if first_nonzero_idx != 0: print(termcolor.colored(f"      - [WARNING] None Zero-Index Volume Used During The Volume Normalization. Used Index: {first_nonzero_idx.item()}", 'light_red'))
         else:
-            _baseAssetVolume_initial = 1.0
-            print(termcolor.colored("      - [WARNING] No non-zero volume found during the volume normalization. Setting the initial value to 1.0", 'light_red'))
-        #---[2-2]: Base Values
-        _data[:,0:4] = _data[:,0:4]/_closePrice_initial
-        _data[:,4:6] = _data[:,4:6]/_baseAssetVolume_initial
-        _data[:,7]   = _data[:,7]  /_closePrice_initial
+            baseAssetVolume_initial = 1.0
+            print(termcolor.colored("      - [WARNING] No Non-Zero Volume Found During The Volume Normalization. Assuming The Initial Value Of 1.0", 'light_red'))
+        data_klines[:,KLINEINDEX_OPENPRICE]  = data_klines[:,KLINEINDEX_OPENPRICE] /closePrice_initial
+        data_klines[:,KLINEINDEX_HIGHPRICE]  = data_klines[:,KLINEINDEX_HIGHPRICE] /closePrice_initial
+        data_klines[:,KLINEINDEX_LOWPRICE]   = data_klines[:,KLINEINDEX_LOWPRICE]  /closePrice_initial
+        data_klines[:,KLINEINDEX_CLOSEPRICE] = data_klines[:,KLINEINDEX_CLOSEPRICE]/closePrice_initial
+        data_klines[:,KLINEINDEX_VOLBASE]         = data_klines[:,KLINEINDEX_VOLBASE]        /baseAssetVolume_initial
+        data_klines[:,KLINEINDEX_VOLBASETAKERBUY] = data_klines[:,KLINEINDEX_VOLBASETAKERBUY]/baseAssetVolume_initial
+        #---[2-3]: Update Klines Data
+        self.__data_klines = data_klines.contiguous()
 
-        #---[2-3]: First Full PIP Index
-        _data_pip_hasNan_lastSwing = torch.isnan(_data[:,6:8]).any(dim  =1)
-        _data_pip_hasNan_NNASignal = torch.isnan(_data[:,8:9]).any(dim  =1)
-        _data_pip_hasNan_CSSignal  = torch.isnan(_data[:,9:10]).any(dim =1)
-        _data_pip_hasNan_IVP       = torch.isnan(_data[:,10:21]).any(dim=1)
-        if _data_pip_hasNan_lastSwing.all(): print(termcolor.colored("      - [NOTICE] No PIP data found for 'LAST SWING'. User attention advised.", 'light_yellow'))
-        if _data_pip_hasNan_NNASignal.all(): print(termcolor.colored("      - [NOTICE] No PIP data found for 'NNA Signal'. User attention advised.", 'light_yellow'))
-        if _data_pip_hasNan_CSSignal.all():  print(termcolor.colored("      - [NOTICE] No PIP data found for 'CS Signal'. User attention advised.",  'light_yellow'))
-        if _data_pip_hasNan_IVP.all():       print(termcolor.colored("      - [NOTICE] No PIP data found for 'IVP'. User attention advised.",        'light_yellow'))
+        #[3]: Analysis Tensor
+        #---[2-1]: Analysis Data Load
+        data_analysis = torch.full(size = (dataLen, len(self.inputDataKeys)), fill_value = torch.nan, device='cuda', dtype=_TORCHDTYPE)
+        for lIndex, laKey in enumerate(self.inputDataKeys):
+            #[2-1-1]: Linearized Analysis Key Check
+            if laKey not in indexIdentifier:
+                print(termcolor.colored(f"      - [WARNING] Linearized Analysis Key '{laKey}' Not Found In The Index Identifier. The Corresponding Data Will Stay Empty", 'light_red'))
+                continue
+            aIndex = indexIdentifier[laKey]
+            #[2-1-2]: Analysis Data Preprocessing (Recognition & Normalization) & Update
+            data_analysis[:,lIndex] = self.__preprocessAnalysisData(linearizedAnalysisKey   = laKey,
+                                                                    analysisDataLine        = linearizedAnalysis[:,aIndex],
+                                                                    closePrice_initial      = closePrice_initial,
+                                                                    baseAssetVolume_initial = baseAssetVolume_initial)
+        #---[2-2]: Save Contiguous Analysis Data
+        self.__data_analysis = data_analysis.contiguous()
 
-        #[4]: Zero-Padding
-        _data_len        = _data.size(dim=0)
-        _data_len_nToPad = (32-(_data_len%32))%32
-        self.__data_nValidSamples = _data_len
-        if (0 < _data_len_nToPad): _data = torch.cat([_data, torch.zeros((_data_len_nToPad, _data.size(dim = 1)), device='cuda', dtype=_TORCHDTYPE)], dim=0).contiguous()
+    def __preprocessAnalysisData(self, linearizedAnalysisKey, analysisDataLine, closePrice_initial, baseAssetVolume_initial):
+        #[1]: Linearized Analysis Key Check
+        laKeySplit    = linearizedAnalysisKey.split("_")
+        laKeySplitLen = len(laKeySplit)
+        if laKeySplitLen == 2: 
+            aType, valType = laKeySplit
+            aLine = None
+        elif laKeySplitLen == 3: 
+            aType, aLine, valType = laKeySplit
+        else:
+            print(termcolor.colored(f"      - [WARNING] Unexpected Format Of Linearized Analysis Key Detected - '{linearizedAnalysisKey}'. User Attention Strongly Advised", 'light_red'))
+            return analysisDataLine
+        
+        #[2]: Type-Dependent Normalization
+        aType_unrecognized   = False
+        valType_unrecognized = False
+        adl_pp = analysisDataLine
 
-        #[5]: Finally
-        self.__data_price_open  = _data[:,0].contiguous()
-        self.__data_price_high  = _data[:,1].contiguous()
-        self.__data_price_low   = _data[:,2].contiguous()
-        self.__data_price_close = _data[:,3].contiguous()
-        self.__data_volume      = _data[:,4].contiguous()
-        self.__data_volume_tb   = _data[:,5].contiguous()
-        self.__data_pip_lst     = _data[:,6].contiguous()
-        self.__data_pip_lsp     = _data[:,7].contiguous()
-        self.__data_pip_nna     = _data[:,8].contiguous()
-        self.__data_pip_csf     = _data[:,9].contiguous()
-        self.__data_pip_ivp     = _data[:,10:20].contiguous()
+        #---[2-1]: Analysis Type - SMA
+        if aType == 'SMA':
+            if valType == 'SMA':
+                adl_pp = analysisDataLine/closePrice_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-2]: Analysis Type - WMA
+        elif aType == 'WMA':
+            if valType == 'WMA':
+                adl_pp = analysisDataLine/closePrice_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-3]: Analysis Type - EMA
+        elif aType == 'EMA':
+            if valType == 'EMA':
+                adl_pp = analysisDataLine/closePrice_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-4]: Analysis Type - PSAR
+        elif aType == 'PSAR':
+            if valType == 'PSAR':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'DCC':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-5]: Analysis Type - BOL
+        elif aType == 'BOL':
+            if valType == 'BOLLOW':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'BOLHIGH':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'MA':
+                adl_pp = analysisDataLine/closePrice_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-6]: Analysis Type - IVP
+        elif aType == 'IVP':
+            if valType.startswith("NB") and valType[2:].isdigit():
+                adl_pp = analysisDataLine/closePrice_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-7]: Analysis Type - SWING
+        elif aType == 'SWING':
+            if valType == 'LSTIMESTAMP':
+                adl_pp = analysisDataLine
+            elif valType == 'LSPRICE':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'LSTYPE':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-8]: Analysis Type - VOL
+        elif aType == 'VOL':
+            if valType == 'MABASE':
+                adl_pp = analysisDataLine/baseAssetVolume_initial
+            elif valType == 'MABASETB':
+                adl_pp = analysisDataLine/baseAssetVolume_initial
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-9]: Analysis Type - NNA
+        elif aType == 'NNA':
+            if valType == 'NNA':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-10]: Analysis Type - MMACDSHORT
+        elif aType == 'MMACDSHORT':
+            if valType == 'MSDELTA':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'MSDELTAABSMA':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'MSDELTAABSREL':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-11]: Analysis Type - MMACDLONG
+        elif aType == 'MMACDLONG':
+            if valType == 'MSDELTA':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'MSDELTAABSMA':
+                adl_pp = analysisDataLine/closePrice_initial
+            elif valType == 'MSDELTAABSREL':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-12]: Analysis Type - DMIxADX
+        elif aType == 'DMIxADX':
+            if valType == 'ABSATHREL':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-13]: Analysis Type - MFI
+        elif aType == 'MFI':
+            if valType == 'ABSATHREL':
+                adl_pp = analysisDataLine
+            else: 
+                valType_unrecognized = True
+
+
+
+        #---[2-14]: Unrecognizable Analysis Type
+        else:
+            aType_unrecognized = True
+
+
+
+        #[3]: Result Interpretation
+        if aType_unrecognized:   print(termcolor.colored(f"      - [WARNING] Unrecognized Analysis Type Detected During Linearized Analysis Data Normalization - '{aType}'. User Attention Strongly Advised", 'light_red'))
+        if valType_unrecognized: print(termcolor.colored(f"      - [WARNING] Unrecognized Value Type Detected During Linearized Analysis Data Normalization - '{valType}'. User Attention Strongly Advised", 'light_red'))
+        return adl_pp
 
     def initializeSeeker(self, 
                          paramConfig: list, 
@@ -978,86 +791,73 @@ class exitFunction():
                 (time.perf_counter_ns()-t_cpu_beg_ns)/1e6/len(params_test)-t_processing_sim_paramsSet_ms)
 
     def __processBatch(self, params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        #Data
-        _size_paramsBatch = params.size(dim = 0)
-        _size_dataLen     = self.__data_price_open.size(dim = 0)
-        _params_trade = params[:,:2]
-        _params_model = params[:,2:]
+        #[1]: Data
+        size_paramsBatch = params.size(dim = 0)
+        size_dataLen     = self.__data_klines.size(dim = 0)
+        params_trade = params[:,:2]
+        params_model = params[:,2:]
 
-        #Params Length Padding
-        _params_lToPad = (16-(_params_model.size(dim=1)%16))%16
-        _params_lToPad = 0
-        if (0 < _params_lToPad): _params_model = torch.cat([_params_model, torch.zeros((_size_paramsBatch, _params_lToPad), device='cuda', dtype=_TORCHDTYPE)], dim=1).contiguous()
+        #[2]: Model Parameters Length Padding
+        params_lToPad = (16-(params_model.size(dim=1)%16))%16
+        if 0 < params_lToPad: params_model = torch.cat([params_model, torch.zeros((size_paramsBatch, params_lToPad), device='cuda', dtype=_TORCHDTYPE)], dim=1)
+        params_model = params_model.contiguous()
 
-        #Result Buffers
-        _balance_finals               = torch.empty(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-        _balance_bestFit_intercepts   = torch.empty(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-        _balance_bestFit_growthRates  = torch.empty(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-        _balance_bestFit_volatilities = torch.empty(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+        #[3]: Result Buffers Initialization
+        balance_finals               = torch.empty(size = (size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+        balance_bestFit_intercepts   = torch.empty(size = (size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+        balance_bestFit_growthRates  = torch.empty(size = (size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+        balance_bestFit_volatilities = torch.empty(size = (size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
         if self.isSeeker:
-            _balance_wallet_history  = torch.empty(size = (1,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-            _balance_margin_history  = torch.empty(size = (1,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+            balance_wallet_history  = torch.empty(size = (1,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+            balance_margin_history  = torch.empty(size = (1,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
         else:
-            _balance_wallet_history  = torch.empty(size = (_size_paramsBatch, self.__data_nValidSamples), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-            _balance_margin_history  = torch.empty(size = (_size_paramsBatch, self.__data_nValidSamples), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
-        _balance_ftIndexes = torch.full(size = (_size_paramsBatch,), fill_value = -1, device = 'cuda', dtype = torch.int32, requires_grad = False)
-        _nTrades = torch.zeros(size = (_size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+            balance_wallet_history  = torch.empty(size = (size_paramsBatch, size_dataLen), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+            balance_margin_history  = torch.empty(size = (size_paramsBatch, size_dataLen), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
+        balance_ftIndexes = torch.full(size = (size_paramsBatch,), fill_value = -1, device = 'cuda', dtype = torch.int32, requires_grad = False)
+        nTrades = torch.zeros(size = (size_paramsBatch,), device = 'cuda', dtype = _TORCHDTYPE, requires_grad = False)
 
-        #Processing
-        _grid = (_size_paramsBatch,)
-        processBatch_triton_kernel[_grid](#Constants
-                                          leverage        = self.leverage,
-                                          allocationRatio = ALLOCATIONRATIO,
-                                          tradingFee      = TRADINGFEE,
-                                          #Base Data
-                                          data_price_open     = self.__data_price_open,
-                                          data_price_high     = self.__data_price_high,
-                                          data_price_low      = self.__data_price_low,
-                                          data_price_close    = self.__data_price_close,
-                                          data_volume         = self.__data_volume,
-                                          data_volume_tb      = self.__data_volume_tb,
-                                          data_pip_lst        = self.__data_pip_lst,
-                                          data_pip_lsp        = self.__data_pip_lsp,
-                                          data_pip_nna        = self.__data_pip_nna,
-                                          data_pip_csf        = self.__data_pip_csf,
-                                          data_pip_ivp        = self.__data_pip_ivp,
-                                          data_pip_ivp_stride = self.__data_pip_ivp.stride(dim=0),
-                                          params_trade_fslImmed   = _params_trade[:,0].contiguous(),
-                                          params_trade_fslClose   = _params_trade[:,1].contiguous(),
-                                          params_trade_pslReentry = self.pslReentry,
-                                          params_model          = _params_model,
-                                          params_model_stride   = _params_model.stride(dim = 0),
-                                          #Result Buffers
-                                          balance_finals               = _balance_finals,
-                                          balance_bestFit_intercepts   = _balance_bestFit_intercepts,
-                                          balance_bestFit_growthRates  = _balance_bestFit_growthRates,
-                                          balance_bestFit_volatilities = _balance_bestFit_volatilities,
-                                          balance_wallet_history       = _balance_wallet_history,
-                                          balance_margin_history       = _balance_margin_history,
-                                          balance_ftIndexes            = _balance_ftIndexes,
-                                          nTrades_rb                   = _nTrades,
-                                          #Sizes
-                                          size_paramsBatch = _size_paramsBatch,
-                                          size_dataLen     = _size_dataLen,
-                                          size_loop        = self.__data_nValidSamples,
-                                          #Mode
-                                          MODELNAME  = self.MODELNAME,
-                                          SEEKERMODE = self.isSeeker,
-                                          #Triton Config
-                                          num_warps  = 1,
-                                          num_stages = 2
-                                         )
+        #[4]: Processing
+        self.modelBatchProcessFunction(#Constants
+                                       leverage        = self.leverage,
+                                       allocationRatio = ALLOCATIONRATIO,
+                                       tradingFee      = TRADINGFEE,
+                                       #Base Data
+                                       data_klines             = self.__data_klines,
+                                       data_klines_stride      = self.__data_klines.stride(dim=0),
+                                       data_analysis           = self.__data_analysis,
+                                       data_analysis_stride    = self.__data_analysis.stride(dim=0),
+                                       params_trade_fslImmed   = params_trade[:,0].contiguous(),
+                                       params_trade_fslClose   = params_trade[:,1].contiguous(),
+                                       params_trade_pslReentry = self.pslReentry,
+                                       params_model            = params_model,
+                                       params_model_stride     = params_model.stride(dim = 0),
+                                       #Result Buffers
+                                       balance_finals               = balance_finals,
+                                       balance_bestFit_intercepts   = balance_bestFit_intercepts,
+                                       balance_bestFit_growthRates  = balance_bestFit_growthRates,
+                                       balance_bestFit_volatilities = balance_bestFit_volatilities,
+                                       balance_wallet_history       = balance_wallet_history,
+                                       balance_margin_history       = balance_margin_history,
+                                       balance_ftIndexes            = balance_ftIndexes,
+                                       nTrades_rb                   = nTrades,
+                                       #Sizes
+                                       size_paramsBatch = size_paramsBatch,
+                                       size_dataLen     = size_dataLen,
+                                       #Mode
+                                       SEEKERMODE = self.isSeeker
+                                       )
 
-        #Return Result
-        if self.isSeeker: return _balance_finals, _balance_bestFit_growthRates, _balance_bestFit_volatilities, _nTrades
+        #[5]: Return Result
+        if self.isSeeker: 
+            return balance_finals, balance_bestFit_growthRates, balance_bestFit_volatilities, nTrades
         else:
-            _indexGrid         = torch.arange(self.__data_nValidSamples, device='cuda', dtype=_TORCHDTYPE).unsqueeze(0)
-            _ftIndexes_bc      = _balance_ftIndexes.unsqueeze(1)
+            _indexGrid         = torch.arange(size_dataLen, device='cuda', dtype=_TORCHDTYPE).unsqueeze(0)
+            _ftIndexes_bc      = balance_ftIndexes.unsqueeze(1)
             _mask_validRegion  = (_indexGrid >= _ftIndexes_bc) & (_ftIndexes_bc != -1)
             _balance_bestFit_x = _indexGrid - _ftIndexes_bc
-            _balance_bestFit_history_raw = torch.exp(_balance_bestFit_growthRates.unsqueeze(1)*_balance_bestFit_x + _balance_bestFit_intercepts.unsqueeze(1))
+            _balance_bestFit_history_raw = torch.exp(balance_bestFit_growthRates.unsqueeze(1)*_balance_bestFit_x + balance_bestFit_intercepts.unsqueeze(1))
             _balance_bestFit_history = torch.where(_mask_validRegion, _balance_bestFit_history_raw, float('nan'))
-            return _balance_wallet_history, _balance_margin_history, _balance_bestFit_history, _balance_bestFit_growthRates, _balance_bestFit_volatilities, _nTrades
+            return balance_wallet_history, balance_margin_history, _balance_bestFit_history, balance_bestFit_growthRates, balance_bestFit_volatilities, nTrades
 
     @BPST_Timer
     def __performOnParams_Timed(self, params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

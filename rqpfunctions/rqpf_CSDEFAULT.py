@@ -13,6 +13,8 @@ MODEL = [{'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Immed <NECESSARY>
          {'PRECISION': 6, 'LIMIT': (0.000000, 1.000000)}, #Strength - LONG
         ]
 
+INPUTDATAKEYS = ['MMACDLONG_MSDELTAABSMAREL',]
+
 """
 <Triton Kernel Function>
  * This is an RQP value calculation function written in Triton.
@@ -21,15 +23,18 @@ MODEL = [{'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Immed <NECESSARY>
    recognize and call this function, the user must implement the model parameter import, state trackers initialization, and function call parts for the new specific model. Check 'processBatch_triton_kernel' function in 'exitFunction_base.py'
 """
 @triton.jit
-def getRQPValue(#Model Parameters <UNIQUE>
-                mp_delta,
-                mp_strength_S,
-                mp_strength_L,
-                #Model State Trackers <UNIQUE>
-                st_pip_csf_prev,
-                #Base Data <COMMON>
-                data_pip_csf,
-                rqpVal_prev):
+def initializeMST(blockSize: tl.constexpr):
+    mst0 = tl.full([blockSize,], -1.0, dtype=tl.float32)
+    mst1 = tl.full([blockSize,], -1.0, dtype=tl.float32)
+    mst2 = tl.full([blockSize,], -1.0, dtype=tl.float32)
+
+    mst = [mst0, mst1, mst2]
+    return mst
+@triton.jit
+def getRQPValue(kline_base_ptr, analysis_base_ptr, mp, mst, blockSize):
+    
+    return tl.zeros(shape = [blockSize,], dtype = tl.float32), mst
+
     #[1]: Record Original Values
     st_pip_csf_prev_original = st_pip_csf_prev
 

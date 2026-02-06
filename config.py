@@ -2,58 +2,53 @@
 """
  * This parameter defines the model to test with a specific set of parameters.
 """
-PARAMETERTEST = {'ppips':            'USC5_ppips\\USC5_BTCUSDT',
-                 'exitFunctionType': 'CSPDRG1',
-                 'leverage':         1,
-                 'params':           (1.0, 1.0, 0.000000, 0.057000, 0.123000, 0.074000, 0.000200, 10.0, 0.007200, 0.608000, 0.213700, 0.000000, 10.0),
+PARAMETERTEST = {'analysisData':     'USC16_ae\\USC16_BTCUSDT',
+                 'exitFunctionType': 'SPDDEFAULT',
+                 'leverage':         2,
+                 'params':           (0.4106, 1.0, -0.946063, 0.027662, 0.983695, 0.03573, 0.828499, 0.4511),
                  'pslReentry':       False,
                 }
 
-#[2]: PPIPS to Process
+#[2]: Analysis Data to Process
 """
  * This parameter defines the model 
 """
-PPIPSTOPROCESS = [{'ppips':            'USC5_ppips\\USC5_BTCUSDT',
-                   'exitFunctionType': 'CSPDRG1',
-                   'leverage':   1,
-                   'pslReentry': False,
-                   'parameterBatchSize': 32*4096,
-                   'paramConfig': [None,
-                                   1.0000,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   None,
-                                   ],
-                   'nSeekerPoints':            100,
-                   'nRepetition':              10,
-                   'learningRate':             0.001,
-                   'deltaRatio':               0.10,
-                   'beta_velocity':            0.999,
-                   'beta_momentum':            0.900,
-                   'repopulationRatio':        0.95,
-                   'repopulationInterval':     10,
-                   'repopulationGuideRatio':   0.5,
-                   'repopulationDecayRate':    0.1,
-                   'scoringSamples':           50,
-                   'scoring':                  'SHARPERATIO',
-                   'scoring_maxMDD':           1,
-                   'scoring_growthRateWeight': 1.0,
-                   'scoring_growthRateScaler': 1e5,
-                   'scoring_volatilityWeight': 0.1,
-                   'scoring_volatilityScaler': 0.1,
-                   'scoring_nTradesWeight':    0.1,
-                   'scoring_nTradesScaler':    0.00001,
-                   'terminationThreshold':     1e-6,
-                  },
-                 ]
+SEEKERTARGETS = [{'analysisData':     'USC14_ae\\USC14_BTCUSDT',
+                  'exitFunctionType': 'SPDDEFAULT',
+                  'leverage':   2,
+                  'pslReentry': False,
+                  'parameterBatchSize': 32*4096*4,
+                  'paramConfig': [None,
+                                  1.0000,
+                                  None,
+                                  None,
+                                  None,
+                                  None,
+                                  None,
+                                  None,
+                                  ],
+                  'nSeekerPoints':            1000,
+                  'nRepetition':              10,
+                  'learningRate':             0.001,
+                  'deltaRatio':               0.10,
+                  'beta_velocity':            0.999,
+                  'beta_momentum':            0.900,
+                  'repopulationRatio':        0.95,
+                  'repopulationInterval':     10,
+                  'repopulationGuideRatio':   0.5,
+                  'repopulationDecayRate':    0.1,
+                  'scoringSamples':           50,
+                  'scoring':                  'SHARPERATIO',
+                  'scoring_maxMDD':           1,
+                  'scoring_growthRateWeight': 1.0,
+                  'scoring_growthRateScaler': 1e5,
+                  'scoring_volatilityWeight': 0.1,
+                  'scoring_volatilityScaler': 0.1,
+                  'scoring_nTradesWeight':    0.1,
+                  'scoring_nTradesScaler':    0.00001,
+                  'terminationThreshold':     1e-6,
+                 },
+                ]
 
 
 """
@@ -86,4 +81,4 @@ RCODETOREAD = 'rqpfpResult_1768759273'
  * 
  * Available Modes: 'TEST'/'SEEK'/'READ'
 """
-MODE = 'SEEK'
+MODE = 'TEST'

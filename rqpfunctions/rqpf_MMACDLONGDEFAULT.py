@@ -15,9 +15,7 @@ KLINEINDEX_VOLBASETAKERBUY: tl.constexpr = sf.KLINEINDEX_VOLBASETAKERBUY
 FUNCTION MODEL: MMACDLONGDEFAULT (MMACDLONG Default)
  * The first two parameters are required by the system, and must always be included in the format as they are.
 """
-MODEL = [{'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)},     #FSL Immed <NECESSARY>
-         {'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)},     #FSL Close <NECESSARY>
-         {'PRECISION': 4, 'LIMIT': (0.0001,   5.0000)},   #Alpha
+MODEL = [{'PRECISION': 4, 'LIMIT': (0.0001,   5.0000)},   #Alpha
          {'PRECISION': 2, 'LIMIT': (1.00,     10.00)},    #Beta
          {'PRECISION': 4, 'LIMIT': (-1.0000,  1.0000)},   #Delta
          {'PRECISION': 6, 'LIMIT': (0.000000, 1.000000)}, #Strength - SHORT

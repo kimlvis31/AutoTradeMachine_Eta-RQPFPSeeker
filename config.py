@@ -5,14 +5,15 @@
 PARAMETERTEST = {'analysisData':     'USC7_ae\\USC7_BTCUSDT',
                  'exitFunctionType': 'SPDDEFAULT',
                  'leverage':         1,
-                 'params':           (0.0100, 1.0, -0.439299, 0.014246, 0.517208, 0.035750, 0.671966, 0.671804),
+                 'tradeParams':      (0.0100, 1.0),
+                 'modelParams':      (-0.439299, 0.014246, 0.517208, 0.035750, 0.671966, 0.671804),
                  'pslReentry':       False,
                 }
 """
 PARAMETERTEST = {'analysisData':     'USC7_ae\\USC7_BTCUSDT',
                  'exitFunctionType': 'MMACDLONGDEFAULT',
-                 'leverage':         1,
-                 'params':           (0.0061, 1.0, 4.9633, 5.61, -0.9308, 0.380649, 1.000000),
+                 'tradeParams':      (0.0061, 1.0),
+                 'modelParams':      (4.9633, 5.61, -0.9308, 0.380649, 1.000000),
                  'pslReentry':       False,
                 }
 """
@@ -23,18 +24,12 @@ PARAMETERTEST = {'analysisData':     'USC7_ae\\USC7_BTCUSDT',
 """
 SEEKERTARGETS = [{'analysisData':     'USC7_ae\\USC7_BTCUSDT',
                   'exitFunctionType': 'MMACDLONGDEFAULT',
-                  'leverage':   1,
-                  'pslReentry': False,
-                  'parameterBatchSize': 32*4096*16,
-                  'paramConfig': [None,
-                                  1.0000,
-                                  None,
-                                  None,
-                                  None,
-                                  None,
-                                  None,
-                                  ],
+                  'leverage':         1,
+                  'pslReentry':       False,
+                  'tradeParamConfig': (None, 1.0000),
+                  'modelParamConfig': (None, None, None, None, None),
                   'nSeekerPoints':            10000,
+                  'parameterBatchSize':       None,
                   'nRepetition':              10,
                   'learningRate':             0.001,
                   'deltaRatio':               0.10,
@@ -88,4 +83,4 @@ RCODETOREAD = 'rqpfpResult_1768759273'
  * 
  * Available Modes: 'TEST'/'SEEK'/'READ'
 """
-MODE = 'TEST'
+MODE = 'SEEK'

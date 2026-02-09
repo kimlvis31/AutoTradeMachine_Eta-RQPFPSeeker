@@ -14,11 +14,7 @@ KLINEINDEX_VOLBASETAKERBUY: tl.constexpr = sf.KLINEINDEX_VOLBASETAKERBUY
 FUNCTION MODEL: SPDDEFAULT (Swing Price Deviation Default)
  * The first two parameters are required by the system, and must always be included in the format as they are.
 """
-MODEL = [#TRADE PARAMETERS <NECESSARY>
-         {'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Immed
-         {'PRECISION': 4, 'LIMIT': (0.0000, 1.0000)}, #FSL Close
-         #MODEL PARAMETERS
-         {'PRECISION': 4, 'LIMIT': (-1.0000,   1.0000)},   #Delta    - SHORT
+MODEL = [{'PRECISION': 4, 'LIMIT': (-1.0000,   1.0000)},   #Delta    - SHORT
          {'PRECISION': 6, 'LIMIT': ( 0.000000, 1.000000)}, #Strength - SHORT
          {'PRECISION': 6, 'LIMIT': ( 0.000000, 1.000000)}, #Length   - SHORT
          {'PRECISION': 4, 'LIMIT': (-1.0000,   1.0000)},   #Delta    - LONG

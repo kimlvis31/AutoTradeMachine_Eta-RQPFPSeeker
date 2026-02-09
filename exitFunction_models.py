@@ -12,7 +12,7 @@ RQPFUNCTIONS_MODEL                = dict()
 RQPFUNCTIONS_INPUTDATAKEY         = dict()
 RQPFUNCTIONS_BATCHPROCESSFUNCTION = dict()
 for name_file in files_rqpfunctions:
-    if not (name_file.startswith('rqpf_') and name_file.endswith('.py') and name_file == 'rqpf_SPDDEFAULT.py'): continue
+    if not (name_file.startswith('rqpf_') and name_file.endswith('.py')): continue
     name_module   = name_file[:-3]
     name_function = name_file[5:-3]
     try:

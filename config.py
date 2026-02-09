@@ -2,22 +2,30 @@
 """
  * This parameter defines the model to test with a specific set of parameters.
 """
-PARAMETERTEST = {'analysisData':     'USC16_ae\\USC16_BTCUSDT',
+PARAMETERTEST = {'analysisData':     'USC7_ae\\USC7_BTCUSDT',
                  'exitFunctionType': 'SPDDEFAULT',
-                 'leverage':         2,
-                 'params':           (0.4106, 1.0, -0.946063, 0.027662, 0.983695, 0.03573, 0.828499, 0.4511),
+                 'leverage':         1,
+                 'params':           (0.0100, 1.0, -0.439299, 0.014246, 0.517208, 0.035750, 0.671966, 0.671804),
                  'pslReentry':       False,
                 }
+"""
+PARAMETERTEST = {'analysisData':     'USC7_ae\\USC7_BTCUSDT',
+                 'exitFunctionType': 'MMACDLONGDEFAULT',
+                 'leverage':         1,
+                 'params':           (0.0061, 1.0, 4.9633, 5.61, -0.9308, 0.380649, 1.000000),
+                 'pslReentry':       False,
+                }
+"""
 
 #[2]: Analysis Data to Process
 """
  * This parameter defines the model 
 """
-SEEKERTARGETS = [{'analysisData':     'USC14_ae\\USC14_BTCUSDT',
-                  'exitFunctionType': 'SPDDEFAULT',
-                  'leverage':   2,
+SEEKERTARGETS = [{'analysisData':     'USC7_ae\\USC7_BTCUSDT',
+                  'exitFunctionType': 'MMACDLONGDEFAULT',
+                  'leverage':   1,
                   'pslReentry': False,
-                  'parameterBatchSize': 32*4096*4,
+                  'parameterBatchSize': 32*4096*16,
                   'paramConfig': [None,
                                   1.0000,
                                   None,
@@ -25,9 +33,8 @@ SEEKERTARGETS = [{'analysisData':     'USC14_ae\\USC14_BTCUSDT',
                                   None,
                                   None,
                                   None,
-                                  None,
                                   ],
-                  'nSeekerPoints':            1000,
+                  'nSeekerPoints':            10000,
                   'nRepetition':              10,
                   'learningRate':             0.001,
                   'deltaRatio':               0.10,

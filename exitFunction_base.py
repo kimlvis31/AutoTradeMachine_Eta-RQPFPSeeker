@@ -245,7 +245,7 @@ class exitFunction():
                 adl_pp = analysisDataLine/closePrice_initial
             elif valType == 'MSDELTAABSMA':
                 adl_pp = analysisDataLine/closePrice_initial
-            elif valType == 'MSDELTAABSREL':
+            elif valType == 'MSDELTAABSMAREL':
                 adl_pp = analysisDataLine
             else: 
                 valType_unrecognized = True
@@ -258,7 +258,7 @@ class exitFunction():
                 adl_pp = analysisDataLine/closePrice_initial
             elif valType == 'MSDELTAABSMA':
                 adl_pp = analysisDataLine/closePrice_initial
-            elif valType == 'MSDELTAABSREL':
+            elif valType == 'MSDELTAABSMAREL':
                 adl_pp = analysisDataLine
             else: 
                 valType_unrecognized = True

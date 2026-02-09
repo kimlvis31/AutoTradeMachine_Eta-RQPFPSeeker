@@ -24,7 +24,8 @@ __pycache__/
 !rqpfunctions
 !rqpfunctions/.gitkeep
 rqpfunctions/*.py
-!rqpfunctions/rqpf_CSDEFAULT.py
+!rqpfunctions/simulatorFunctions.py
+!rqpfunctions/rqpf_MMACDLONGDEFAULT.py
 !rqpfunctions/rqpf_SPDDEFAULT.py
 
 !linearizedAnalysis
